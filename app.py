@@ -5,10 +5,10 @@ import re  # password + email checks
 import pandas as pd  # demo chart on Progress page
 import base64  # for background image + logo
 
-import workout_planner  # teammates' workout builder
-import workout_calendar  # teammates' calendar
-import calorie_tracker   # ML-based calorie & protein tracker
-import nutrition_advisory  # NEW: nutrition adviser module
+import workout_planner      # teammates' workout builder
+import workout_calendar     # teammates' calendar
+import calorie_tracker      # ML-based calorie & protein tracker
+import nutrition_advisory   # recipe-based nutrition adviser
 
 
 # ---------- basic page setup ----------
@@ -555,13 +555,13 @@ def show_reset_password_page():
 
 def show_pumpfessor_joe(page_name: str):
     """Small helper box with tips depending on the current page."""
-    with st.expander("Pumpfessor Joe – Need a quick guide?", expanded=False):
+    with st.expander("👨‍🏫 Pumpfessor Joe – Need a quick guide?", expanded=False):
         if page_name == "Profile":
             st.write(
                 "Welcome to your **Profile**! 🧍‍♂️\n\n"
                 "- Enter your age, weight, height, preferences and allergies.\n"
                 "- Click **Save profile**.\n"
-                "- This data is used to personalize your workouts "
+                "- This data can be used to personalize your workouts "
                 "and nutrition advice."
             )
         elif page_name == "Trainer":
@@ -579,9 +579,12 @@ def show_pumpfessor_joe(page_name: str):
             )
         elif page_name == "Nutrition adviser":
             st.write(
-                "The **Nutrition adviser** page 🥗 uses your profile "
-                "(training style, diet preference, allergies) to suggest "
-                "high-protein recipes and daily meal plans."
+                "The **Nutrition adviser** page 🥗 suggests high-protein recipes "
+                "based on your preferences.\n\n"
+                "- Create a simple nutrition profile inside the tab.\n"
+                "- Generate a daily meal plan or search recipes.\n"
+                "- Log what you actually ate and rate meals so Pumpfessor Joe "
+                "learns your tastes."
             )
         elif page_name == "Progress":
             st.write(
@@ -790,60 +793,14 @@ def show_calorie_tracker_page():
 
 
 def show_nutrition_page():
-    """Nutrition adviser page: integrate the external nutrition_advisory module."""
+    """Nutrition adviser page: integrates recipe-based nutrition module."""
     st.header("Nutrition adviser")
     st.divider()
-
-    user_id = st.session_state.user_id
-    p = get_profile(user_id)
-
-    # Username – fall back to email if empty
-    username = p["username"] or st.session_state.get("user_email", "User")
-
-    # Map training_type -> training_goal used by nutrition_advisory
-    tt = (p["training_type"] or "").lower()
-    if "strength" in tt or "hypertrophy" in tt:
-        training_goal = "strength"
-    elif "endurance" in tt:
-        training_goal = "endurance"
-    else:
-        training_goal = "balanced"
-
-    # Map diet_preferences -> diet_pref string that nutrition_advisory expects
-    dp_raw = (p["diet_preferences"] or "No preference").lower()
-    if "vegetarian" in dp_raw:
-        diet_pref = "vegetarian"
-    elif "vegan" in dp_raw:
-        diet_pref = "vegan"
-    elif "mediterranean" in dp_raw:
-        diet_pref = "mediterranean"
-    elif "low carb" in dp_raw:
-        diet_pref = "low carb"
-    else:
-        diet_pref = "omnivore"
-
-    # Allergies text -> list
-    allergies_str = p["allergies"] or ""
-    allergies = [
-        a.strip()
-        for a in allergies_str.replace(";", ",").split(",")
-        if a.strip()
-    ]
-
-    profile_for_nutrition = {
-        "username": username,
-        "training_split": p["training_type"] or "Full Body",
-        "training_goal": training_goal,
-        "diet_pref": diet_pref,
-        "allergies": allergies,
-        # simple placeholder; you could later compute this from calorie_tracker
-        "daily_calories": float(2000),
-    }
 
     col_left, col_center, col_right = st.columns([1, 2, 1])
     with col_center:
         with st.container(border=True):
-            nutrition_advisory.main(profile_for_nutrition)
+            nutrition_advisory.main()
 
 
 def show_progress_page():
