@@ -1,14 +1,26 @@
 import streamlit as st
+# Ganz am Anfang: breites Layout für die gesamte App
+st.set_page_config(
+    page_title="Fitness App",
+    layout="wide",          # das sorgt dafür, dass alles breit angezeigt wird
+    initial_sidebar_state="expanded"
+)
 import sqlite3
 import hashlib
 import re  # password + email checks
 import pandas as pd  # demo chart on Progress page
 import base64  # for background image + logo
 
-import workout_planner      # teammates' workout builder
-import workout_calendar     # teammates' calendar
-import calorie_tracker      # ML-based calorie & protein tracker
-import nutrition_advisory   # recipe-based nutrition adviser
+import workout_planner  # teammates' workout builder
+import workout_calendar  # teammates' calendar
+import calorie_tracker   # ML-based calorie & protein tracker
+import nutrition_advisory
+from nutrition_advisory import main as nutrition_main, load_and_prepare_data, DATA_URL
+
+# DataFrame nur einmal beim App-Start laden
+if "recipes_df" not in st.session_state:
+    with st.spinner("Loading recipe data..."):
+        st.session_state.recipes_df = load_and_prepare_data(DATA_URL)
 
 
 # ---------- basic page setup ----------
@@ -176,49 +188,48 @@ def get_db():
 
 
 def create_tables():
-    """Create tables for users and profiles if they do not exist
-    and ensure new columns are present."""
+    """Create users and profiles tables if they don't exist, add missing columns."""
     conn = get_db()
     cur = conn.cursor()
 
     # users table
-    cur.execute(
-        """
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL
         )
-        """
-    )
+    """)
 
-    # profiles table (extended)
-    cur.execute(
-        """
+    # profiles table
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS profiles (
             user_id INTEGER UNIQUE,
             age INTEGER,
             weight REAL,
             height REAL,
-            username TEXT,
-            allergies TEXT,
-            training_type TEXT,
-            diet_preferences TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
-        """
-    )
+    """)
 
-    # If DB was created earlier without new columns, try to add them
-    for col in ["username", "allergies", "training_type", "diet_preferences"]:
+    # add missing columns if not exist
+    additional_cols = [
+        "username TEXT",
+        "allergies TEXT",
+        "training_type TEXT",
+        "diet_preferences TEXT",
+        "gender TEXT DEFAULT 'Male'",
+        "goal TEXT DEFAULT 'Maintain'"
+    ]
+    for col_def in additional_cols:
         try:
-            cur.execute(f"ALTER TABLE profiles ADD COLUMN {col} TEXT")
+            cur.execute(f"ALTER TABLE profiles ADD COLUMN {col_def}")
         except sqlite3.OperationalError:
-            # column already exists -> ignore
-            pass
+            pass  # column already exists
 
     conn.commit()
     conn.close()
+
 
 
 def hash_password(password: str) -> str:
@@ -579,12 +590,8 @@ def show_pumpfessor_joe(page_name: str):
             )
         elif page_name == "Nutrition adviser":
             st.write(
-                "The **Nutrition adviser** page 🥗 suggests high-protein recipes "
-                "based on your preferences.\n\n"
-                "- Create a simple nutrition profile inside the tab.\n"
-                "- Generate a daily meal plan or search recipes.\n"
-                "- Log what you actually ate and rate meals so Pumpfessor Joe "
-                "learns your tastes."
+                "The **Nutrition adviser** page 🥗 will later give you suggestions on "
+                "meals or macros based on your goals and allergies."
             )
         elif page_name == "Progress":
             st.write(
@@ -603,8 +610,103 @@ def show_pumpfessor_joe(page_name: str):
 # APP PAGES
 # =========================================================
 
+# ... alle bisherigen Imports + CSS + Auth-Funktionen bleiben gleich ...
+
+# =========================================================
+# PROFILE DB ACCESS
+# =========================================================
+
+def get_profile(user_id: int):
+    """Fetch profile info for a given user_id."""
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT age, weight, height,
+               username, allergies, training_type, diet_preferences,
+               gender, goal
+        FROM profiles WHERE user_id = ?
+        """,
+        (user_id,),
+    )
+    row = cur.fetchone()
+    conn.close()
+
+    if row:
+        return {
+            "age": row[0],
+            "weight": row[1],
+            "height": row[2],
+            "username": row[3],
+            "allergies": row[4],
+            "training_type": row[5],
+            "diet_preferences": row[6],
+            "gender": row[7] or "Male",
+            "goal": row[8] or "Maintain",
+        }
+
+    return {
+        "age": None,
+        "weight": None,
+        "height": None,
+        "username": None,
+        "allergies": None,
+        "training_type": None,
+        "diet_preferences": None,
+        "gender": "Male",
+        "goal": "Maintain",
+    }
+
+
+def update_profile(
+    user_id: int,
+    age: int,
+    weight: float,
+    height: float,
+    username: str,
+    allergies: str,
+    training_type: str,
+    diet_preferences: str,
+    gender: str,
+    goal: str,
+):
+    """Update profile values for a given user_id."""
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE profiles
+        SET age = ?, weight = ?, height = ?,
+            username = ?, allergies = ?,
+            training_type = ?, diet_preferences = ?,
+            gender = ?, goal = ?
+        WHERE user_id = ?
+        """,
+        (
+            age,
+            weight,
+            height,
+            username,
+            allergies,
+            training_type,
+            diet_preferences,
+            gender,
+            goal,
+            user_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
+# =========================================================
+# PROFILE PAGE (updated)
+# =========================================================
+
 def show_profile_page():
-    """Profile page with inputs stored in the database."""
+    """Profile page with inputs stored in the database, including Gender + Goal."""
     user_id = st.session_state.user_id
     profile = get_profile(user_id)
 
@@ -641,6 +743,12 @@ def show_profile_page():
                     "Username",
                     value=profile["username"] or "",
                     max_chars=30,
+                )
+
+                gender = st.selectbox(
+                    "Gender",
+                    ["Male", "Female"],
+                    index=0 if profile["gender"] == "Male" else 1,
                 )
 
             with c2:
@@ -686,6 +794,16 @@ def show_profile_page():
                     index=diet_options.index(current_diet),
                 )
 
+                goal_options = ["Cut", "Maintain", "Bulk"]
+                current_goal = profile["goal"] or "Maintain"
+                if current_goal not in goal_options:
+                    current_goal = "Maintain"
+                goal = st.selectbox(
+                    "Goal",
+                    goal_options,
+                    index=goal_options.index(current_goal),
+                )
+
             allergies = st.text_area(
                 "Allergies (optional)",
                 value=profile["allergies"] or "",
@@ -702,6 +820,8 @@ def show_profile_page():
                     allergies.strip() or None,
                     training_type,
                     diet_preferences,
+                    gender,
+                    goal,
                 )
                 st.success("Profile saved.")
 
@@ -711,36 +831,15 @@ def show_profile_page():
         # reload profile from DB (in case it changed)
         profile = get_profile(user_id)
 
-        age_display = profile["age"] if profile["age"] not in (None, 0) else "Not set"
-        weight_display = (
-            profile["weight"] if profile["weight"] not in (None, 0.0) else "Not set"
-        )
-        height_display = (
-            profile["height"] if profile["height"] not in (None, 0.0) else "Not set"
-        )
-        username_display = profile["username"] or "Not set"
-        training_display = profile["training_type"] or "Not set"
-        diet_display = profile["diet_preferences"] or "Not set"
-        allergies_display = profile["allergies"] or "None noted"
-
-        if (
-            age_display == "Not set"
-            and weight_display == "Not set"
-            and height_display == "Not set"
-            and username_display == "Not set"
-            and training_display == "Not set"
-            and diet_display == "Not set"
-            and allergies_display == "None noted"
-        ):
-            st.info("No profile data saved yet.")
-        else:
-            st.write(f"**Username:** {username_display}")
-            st.write(f"**Age:** {age_display} years")
-            st.write(f"**Weight:** {weight_display} kg")
-            st.write(f"**Height:** {height_display} cm")
-            st.write(f"**Training style:** {training_display}")
-            st.write(f"**Diet preference:** {diet_display}")
-            st.write(f"**Allergies:** {allergies_display}")
+        st.write(f"**Username:** {profile['username'] or 'Not set'}")
+        st.write(f"**Age:** {profile['age'] or 'Not set'} years")
+        st.write(f"**Weight:** {profile['weight'] or 'Not set'} kg")
+        st.write(f"**Height:** {profile['height'] or 'Not set'} cm")
+        st.write(f"**Gender:** {profile['gender']}")
+        st.write(f"**Goal:** {profile['goal']}")
+        st.write(f"**Training style:** {profile['training_type'] or 'Not set'}")
+        st.write(f"**Diet preference:** {profile['diet_preferences'] or 'Not set'}")
+        st.write(f"**Allergies:** {profile['allergies'] or 'None noted'}")
 
         # --- Profile completeness indicator ---
         fields_for_completeness = [
@@ -750,6 +849,8 @@ def show_profile_page():
             profile["height"],
             profile["training_type"],
             profile["diet_preferences"],
+            profile["gender"],
+            profile["goal"],
         ]
         filled_fields = sum(
             1
@@ -757,10 +858,10 @@ def show_profile_page():
             if v not in (None, 0, 0.0, "", "Not set")
         )
         completeness = filled_fields / len(fields_for_completeness)
-
         st.write("")
         st.write("Profile completeness:")
         st.progress(completeness)
+
 
 
 def show_trainer_page():
@@ -793,15 +894,15 @@ def show_calorie_tracker_page():
 
 
 def show_nutrition_page():
-    """Nutrition adviser page: integrates recipe-based nutrition module."""
+    """Nutrition adviser page: load logic from nutrition_advisory.py"""
     st.header("Nutrition adviser")
     st.divider()
 
     col_left, col_center, col_right = st.columns([1, 2, 1])
     with col_center:
         with st.container(border=True):
+            # ruft das externe Modul auf
             nutrition_advisory.main()
-
 
 def show_progress_page():
     """Simple placeholder progress page with a demo chart."""
