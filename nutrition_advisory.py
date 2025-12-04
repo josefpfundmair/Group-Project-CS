@@ -439,12 +439,15 @@ def main(df=None):
         df = load_and_prepare_data(DATA_URL)
         st.session_state.recipes_df = df
 
+    # Load real daily calories from calorie tracker (fallback = 2000)
+    daily_cal = st.session_state.get("daily_target_calories", 2000)
+
     profile = {
-        "daily_calories": 2000,
-        "training_goal": "strength",
+        "daily_calories": daily_cal,
+        "training_goal": "strength",   # Kann später dynamisch werden
         "diet_pref": "omnivore",
         "allergies": [],
-    }
+    }    
 
     # ---------------------- TABS ----------------------
     tab_caltracker, tab_suggested, tab_search, tab_fav = st.tabs([
@@ -620,6 +623,7 @@ def main(df=None):
 
         target_calories = max(target_calories, 1200)
         target_protein = protein_per_kg * weight
+        st.session_state.daily_target_calories = target_calories
 
         total_cal = sum(m["calories"] for m in st.session_state.ct_meals) + \
                     sum(m["calories"] for m in st.session_state.meal_log)
