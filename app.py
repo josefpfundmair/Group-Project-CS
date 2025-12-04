@@ -1058,26 +1058,30 @@ def main():
         st.sidebar.write("---")
 
     # navigation buttons
-    if st.sidebar.button("Profile"):
-        st.session_state.current_page = "Profile"
-        st.query_params["page"] = slug_for_page("Profile")
+# --- Navigation using a stable selectbox instead of buttons ---
+    menu_options = ["Profile"]
 
     if profile_complete:
-        if st.sidebar.button("Trainer"):
-            st.session_state.current_page = "Trainer"
-            st.query_params["page"] = slug_for_page("Trainer")
-        if st.sidebar.button("Calorie tracker"):
-            st.session_state.current_page = "Calorie tracker"
-            st.query_params["page"] = slug_for_page("Calorie tracker")
-        if st.sidebar.button("Calories and nutrition"):
-            st.session_state.current_page = "Calories & Nutrition"
-            st.query_params["page"] = slug_for_page("Calories & Nutrition")
-        if st.sidebar.button("Nutrition adviser"):
-            st.session_state.current_page = "Nutrition adviser"
-            st.query_params["page"] = slug_for_page("Nutrition adviser")
-        if st.sidebar.button("Progress"):
-            st.session_state.current_page = "Progress"
-            st.query_params["page"] = slug_for_page("Progress")
+        menu_options += [
+            "Trainer",
+            "Calorie tracker",
+            "Calories & Nutrition",
+            "Nutrition adviser",
+            "Progress",
+        ]
+
+    current_page = st.sidebar.selectbox(
+        "Navigation",
+        menu_options,
+        index=menu_options.index(st.session_state.current_page)
+            if st.session_state.current_page in menu_options else 0,
+        key="page_selector"
+    )
+
+    # update current page + URL
+    st.session_state.current_page = current_page
+    st.query_params["page"] = slug_for_page(current_page)
+
     else:
         st.sidebar.caption("Complete your profile to unlock the applications.")
 
