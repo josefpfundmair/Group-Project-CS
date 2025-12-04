@@ -915,7 +915,7 @@ def show_pumpfessor_sidebar():
                 st.session_state.pumpfessor_messages.append(
                     {"role": "assistant", "content": answer}
                 )
-                st.experimental_rerun()
+                st.rerun()  # updated from st.experimental_rerun()
 
 
 # =========================================================
@@ -1027,9 +1027,9 @@ def main():
     if LOGO_IMAGE:
         st.sidebar.markdown(
             f"""
-            <div style="padding-top:0rem; padding-bottom:1rem; text-align:left;">
+            <div style="padding-top:0.25rem; padding-bottom:0.5rem; text-align:center;">
                 <img src="data:image/png;base64,{LOGO_IMAGE}"
-                     style="width:210px; display:block; margin:0;">
+                     style="width:240px; display:block; margin:0 auto;">
             </div>
             """,
             unsafe_allow_html=True,
@@ -1180,3 +1180,4 @@ if __name__ == "__main__":
             st.session_state.recipes_df = load_and_prepare_data(DATA_URL)
 
     main()
+
