@@ -1103,10 +1103,14 @@ def main():
     page = st.session_state.current_page
 
     # enforce profile completion
-    if not profile_complete and page != "Profile":
-        page = "Profile"
-        st.session_state.current_page = "Profile"
-        st.warning("Please complete your profile before accessing the applications.")
+    # Enforce profile completion only when navigating away from Profile
+    if not profile_complete:
+        allowed_pages = ["Profile"]
+        if page not in allowed_pages:
+            st.session_state.current_page = "Profile"
+            st.warning("Please complete your profile before accessing the applications.")
+            st.rerun()
+
 
     # route pages
     if page == "Profile":
