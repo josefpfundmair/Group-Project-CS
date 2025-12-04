@@ -237,3 +237,22 @@ def update_profile(user_id: int, age: int, weight: float, height: float,
 
     conn.commit()
     conn.close()
+
+def is_profile_complete(profile: dict) -> bool:
+    if not profile.get("username") or profile["username"].strip() == "":
+        return False
+    if not profile.get("age") or profile["age"] <= 0:
+        return False
+    if not profile.get("weight") or profile["weight"] <= 0:
+        return False
+    if not profile.get("height") or profile["height"] <= 0:
+        return False
+    if profile.get("training_type") in (None, "", "Not set"):
+        return False
+    if profile.get("diet_preferences") in (None, "", "Not set"):
+        return False
+    if profile.get("gender") not in ("Male", "Female"):
+        return False
+    if profile.get("goal") not in ("Cut", "Maintain", "Bulk"):
+        return False
+    return True
