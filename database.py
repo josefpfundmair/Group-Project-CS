@@ -3,26 +3,25 @@ import hashlib
 import re
 import os
 
-# ============================================
-#  PERSISTENT DATABASE LOCATION
-# ============================================
+# ---------------------------------------
+# PERSISTENT DATABASE PATH FOR STREAMLIT
+# ---------------------------------------
 
 DB_DIR = ".streamlit"
 DB_PATH = os.path.join(DB_DIR, "gym_app.db")
 
-# ensure the directory exists
+# Create folder if it doesn't exist
 os.makedirs(DB_DIR, exist_ok=True)
 
 def get_db():
-    """Return a database connection to the persistent DB file."""
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = 1")
     return conn
 
 
-# ============================================
-#  TABLE CREATION
-# ============================================
+# ---------------------------------------
+# CREATE TABLES
+# ---------------------------------------
 
 def create_tables():
     conn = get_db()
@@ -54,12 +53,11 @@ def create_tables():
         )
     """)
 
-    # Add missing profile columns dynamically (safety net)
+    # Add missing profile columns dynamically
     for col in ["username", "allergies", "training_type", "diet_preferences", "gender", "goal"]:
         try:
             cur.execute(f"ALTER TABLE profiles ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
-            # column already exists
             pass
 
     # Daily nutrition summary table
@@ -92,12 +90,13 @@ def create_tables():
     conn.close()
 
 
-# ============================================
-#  AUTHENTICATION HELPERS
-# ============================================
+# ---------------------------------------
+# AUTH + PROFILE FUNCTIONS
+# ---------------------------------------
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
+
 
 def validate_password_strength(password: str):
     if len(password) < 8:
@@ -114,13 +113,8 @@ def validate_password_strength(password: str):
 
 
 def is_valid_email(email: str) -> bool:
-    pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
-    return re.match(pattern, email) is not None
+    return re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email) is not None
 
-
-# ============================================
-#  USER MANAGEMENT
-# ============================================
 
 def register_user(email: str, password: str):
     conn = get_db()
@@ -133,7 +127,6 @@ def register_user(email: str, password: str):
         )
         user_id = cur.lastrowid
 
-        # create empty profile row
         cur.execute("""
             INSERT INTO profiles (
                 user_id, age, weight, height, username,
@@ -154,7 +147,6 @@ def register_user(email: str, password: str):
 def verify_user(email: str, password: str):
     conn = get_db()
     cur = conn.cursor()
-
     cur.execute("SELECT id, password_hash FROM users WHERE email = ?", (email,))
     row = cur.fetchone()
     conn.close()
@@ -179,17 +171,13 @@ def reset_password(email: str, new_password: str):
 
     cur.execute(
         "UPDATE users SET password_hash = ? WHERE email = ?",
-        (hash_password(new_password), email),
+        (hash_password(new_password), email)
     )
 
     conn.commit()
     conn.close()
     return True, "Password updated successfully."
 
-
-# ============================================
-#  PROFILE ACCESS
-# ============================================
 
 def get_profile(user_id: int):
     conn = get_db()
@@ -218,12 +206,16 @@ def get_profile(user_id: int):
             "goal": row[8] or "Maintain",
         }
 
-    # fallback if somehow not existing
     return {
-        "age": None, "weight": None, "height": None,
-        "username": None, "allergies": None,
-        "training_type": None, "diet_preferences": None,
-        "gender": "Male", "goal": "Maintain",
+        "age": None,
+        "weight": None,
+        "height": None,
+        "username": None,
+        "allergies": None,
+        "training_type": None,
+        "diet_preferences": None,
+        "gender": "Male",
+        "goal": "Maintain",
     }
 
 
@@ -241,8 +233,7 @@ def update_profile(user_id: int, age: int, weight: float, height: float,
             training_type = ?, diet_preferences = ?,
             gender = ?, goal = ?
         WHERE user_id = ?
-    """, (age, weight, height, username, allergies,
-          training_type, diet_preferences, gender, goal, user_id))
+    """, (age, weight, height, username, allergies, training_type, diet_preferences, gender, goal, user_id))
 
     conn.commit()
     conn.close()
