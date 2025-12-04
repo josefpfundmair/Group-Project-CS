@@ -1,6 +1,16 @@
 import sqlite3
 import hashlib
 import re
+import os
+
+DB_PATH = os.path.join(".streamlit", "gym_app.db")
+
+def get_db():
+    os.makedirs(".streamlit", exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = 1")
+    return conn
+
 
 def get_db():
     conn = sqlite3.connect("gym_app.db")
