@@ -339,11 +339,11 @@ def show_recipe_card(
 
     recipe_name = row["recipe_name"]
     eaten = recipe_name in st.session_state.eaten_today
-    rating_stage = st.session_state.rating_stage.get(recipe_name, "none")
 
     with st.container():
         col_left, col_right = st.columns([1, 5])
 
+        # IMAGE
         with col_left:
             img_url = row.get("image_url", "")
             if img_url:
@@ -351,6 +351,7 @@ def show_recipe_card(
             else:
                 st.write("No image available")
 
+        # INFO
         with col_right:
             st.subheader(recipe_name)
 
@@ -364,49 +365,67 @@ def show_recipe_card(
 
             ingredients = row.get("ingredient_lines_per_serving", [])
 
-            # Nur die ersten drei anzeigen
             first_three = ingredients[:3]
             for line in first_three:
                 st.markdown(f"- {line}")
 
-            # Wenn mehr als 3 Zutaten existieren → Expander anzeigen
             if len(ingredients) > 3:
                 with st.expander("Show more ingredients"):
                     for line in ingredients[3:]:
                         st.markdown(f"- {line}")
 
-
             st.markdown("---")
 
-            # -------------------------- FAVOURITE MODE --------------------------
+            # -------------------
+            # FAVOURITE MODE
+            # -------------------
             if mode == "favourite":
                 if st.button("Remove from favourite recipes", key=f"rmfav_{key_prefix}"):
                     st.session_state.favourite_recipes.discard(row.name)
+                    st.rerun()
                 return
-            # -------------------------- NOT EATEN YET --------------------------
-            # -------------------------- BUTTON LAYOUT --------------------------
-            if not eaten:
 
+            # -------------------
+            # ACTION BUTTONS
+            # -------------------
+            if not eaten:
                 col_left, col_mid, col_right = st.columns(3)
 
-                # Links: I have eaten this
+                # ---- 1) I HAVE EATEN THIS ----
                 if col_left.button("I have eaten this", key=f"eat_{key_prefix}"):
                     log_meal(row, meal_name)
+                    st.session_state.eaten_today.add(recipe_name)
                     st.session_state.rating_stage[recipe_name] = "none"
+                    st.rerun()
 
-                # Mitte: I like this
+                # ---- 2) I LIKE THIS ----
                 if col_mid.button("I like this", key=f"like_{key_prefix}"):
                     st.session_state.favourite_recipes.add(row.name)
                     st.success("Added to favourites!")
+                    st.rerun()
 
-                # Rechts: I don't like this
+                # ---- 3) I DON'T LIKE THIS → NEW SUGGESTION ----
                 if col_right.button("I don't like this", key=f"dislike_{key_prefix}"):
                     if df is not None and meal_target_calories is not None:
-                        new_row = pick_meal(df, meal_name, meal_target_calories, "", pref_model)
-                        if new_row is not None:
-                            st.session_state.daily_plan[meal_name] = (new_row, meal_target_calories)
 
-                return
+                        meal_type = meal_name.lower()   # critical fix!
+
+                        new_row = pick_meal(
+                            df,
+                            meal_type,
+                            meal_target_calories,
+                            "",
+                            pref_model,
+                        )
+
+                        if new_row is not None:
+                            st.session_state.daily_plan[meal_name] = (
+                                new_row,
+                                meal_target_calories,
+                            )
+
+                    st.rerun()
+
 # MAIN APP
 
 def main(df=None):
