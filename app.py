@@ -34,8 +34,11 @@ from database import (
     reset_password,
     get_profile,
     update_profile,
-    is_profile_complete
+    is_profile_complete,
+    validate_password_strength,
+    is_valid_email,
 )
+
 
 PRIMARY_GREEN = "#007A3D"  # HSG-like green
 
