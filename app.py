@@ -967,7 +967,7 @@ def main():
     # sync page from URL (query param)
     params = st.query_params
     if "page" in params:
-        slug = params["page"][0]
+        slug = params["page"]
         st.session_state.current_page = page_for_slug(slug)
 
     # NOT LOGGED IN: auth pages with centered glass window
