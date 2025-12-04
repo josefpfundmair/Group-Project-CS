@@ -1,4 +1,19 @@
 import streamlit as st
+
+# =========================================================
+# BASIC PAGE SETUP  (MUST BE FIRST STREAMLIT COMMAND)
+# =========================================================
+
+st.set_page_config(
+    page_title="UniFit Coach",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# =========================================================
+# IMPORTS
+# =========================================================
+
 import sqlite3
 import hashlib
 import re
@@ -14,16 +29,6 @@ import nutrition_advisory
 import calories_nutrition
 from nutrition_advisory import load_and_prepare_data, DATA_URL
 
-
-# =========================================================
-# BASIC PAGE SETUP  (MUST BE FIRST STREAMLIT COMMAND)
-# =========================================================
-
-st.set_page_config(
-    page_title="UniFit Coach",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
 PRIMARY_GREEN = "#007A3D"  # HSG-like green
 
@@ -1150,10 +1155,11 @@ st.markdown(
 
 
 if __name__ == "__main__":
-    # DataFrame for recipes only once at app start
+    # Load recipes DataFrame once at app start
     if "recipes_df" not in st.session_state:
         with st.spinner("Loading recipe data..."):
             st.session_state.recipes_df = load_and_prepare_data(DATA_URL)
 
     main()
+
 
