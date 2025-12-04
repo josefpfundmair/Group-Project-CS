@@ -58,7 +58,7 @@ def load_logo(path: str) -> str:
 # Files must exist next to app.py
 BACKGROUND_IMAGE = get_base64_of_image("background_pitch.jpg")
 LOGO_IMAGE = load_logo("unifit_logo.png")
-PUMPFESSOR_IMAGE = load_logo("pumpfessorjoe.png")  # Pumpfessor How avatar
+PUMPFESSOR_IMAGE = load_logo("pumpfessorjoe.png")  # Pumpfessor Joe avatar
 
 
 # =========================================================
@@ -805,7 +805,7 @@ def show_progress_page():
 
 
 # =========================================================
-# PUMPFESSOR HOW – SIDEBAR CHATBOT
+# PUMPFESSOR JOE – SIDEBAR CHATBOT
 # =========================================================
 
 def build_user_context(user_id: int) -> str:
@@ -832,12 +832,12 @@ def build_user_context(user_id: int) -> str:
 
 def ask_pumpfessor(question: str, user_id: int, history: list[dict]) -> str:
     """
-    Call OpenAI to get a Pumpfessor How answer based on user context and chat history.
+    Call OpenAI to get a Pumpfessor Joe answer based on user context and chat history.
     """
     user_context = build_user_context(user_id)
 
     system_prompt = (
-        "You are Pumpfessor How, the strict but fair AI strength and nutrition coach "
+        "You are Pumpfessor Joe, the strict but fair AI strength and nutrition coach "
         "for the UniFit Coach app. You base your answers on the user's profile and goals. "
         "Be clear, concise, and practical. Focus on strength training, hypertrophy, "
         "calorie and protein guidance, and habit-building. Do not give medical advice."
@@ -862,21 +862,28 @@ def ask_pumpfessor(question: str, user_id: int, history: list[dict]) -> str:
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        return f"Pumpfessor encountered an error while generating a response: {e}"
+        return f"Pumpfessor Joe encountered an error while generating a response: {e}"
 
 
 def show_pumpfessor_sidebar():
-    """Render Pumpfessor How in the sidebar."""
+    """Render Pumpfessor Joe in the sidebar."""
     st.sidebar.write("---")
     with st.sidebar.container():
-        st.markdown("**Pumpfessor How**")
+        st.sidebar.markdown(
+            """
+            <div style="text-align:center; font-weight:700; margin-bottom:0.5rem;">
+                Pumpfessor Joe
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         if PUMPFESSOR_IMAGE:
             st.sidebar.markdown(
                 f"""
-                <div style="text-align:left; margin-bottom:0.5rem;">
+                <div style="text-align:center; margin-bottom:0.75rem;">
                     <img src="data:image/png;base64,{PUMPFESSOR_IMAGE}"
-                         style="width:90px; border-radius:8px; display:block; margin:0;">
+                         style="width:130px; border-radius:8px; display:block; margin:0 auto;">
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -890,7 +897,7 @@ def show_pumpfessor_sidebar():
             if msg["role"] == "user":
                 st.sidebar.markdown(f"**You:** {msg['content']}")
             else:
-                st.sidebar.markdown(f"**Pumpfessor:** {msg['content']}")
+                st.sidebar.markdown(f"**Pumpfessor Joe:** {msg['content']}")
 
         user_input = st.sidebar.text_input("Ask a question", key="pumpfessor_input")
 
@@ -1020,9 +1027,9 @@ def main():
     if LOGO_IMAGE:
         st.sidebar.markdown(
             f"""
-            <div style="padding-top:0.5rem; padding-bottom:0.5rem; text-align:left;">
+            <div style="padding-top:0rem; padding-bottom:1rem; text-align:left;">
                 <img src="data:image/png;base64,{LOGO_IMAGE}"
-                     style="width:150px; display:block; margin:0;">
+                     style="width:210px; display:block; margin:0;">
             </div>
             """,
             unsafe_allow_html=True,
@@ -1074,7 +1081,7 @@ def main():
     else:
         st.sidebar.caption("Complete your profile to unlock the applications.")
 
-    # Pumpfessor How chatbot (under navigation, above logout)
+    # Pumpfessor Joe chatbot (under navigation, above logout)
     show_pumpfessor_sidebar()
 
     st.sidebar.write("---")
@@ -1130,7 +1137,7 @@ st.markdown(
     /* Sidebar buttons: white by default, green text + border; centered and same width */
     section[data-testid="stSidebar"] div.stButton > button {{
         width: 100% !important;
-        max-width: 220px !important;
+        max-width: 260px !important;
         margin-left: auto !important;
         margin-right: auto !important;
         display: block !important;
