@@ -1,5 +1,4 @@
 import streamlit as st
-
 # =========================================================
 # BASIC PAGE SETUP  (MUST BE FIRST STREAMLIT COMMAND)
 # =========================================================
@@ -26,7 +25,7 @@ import workout_planner
 import workout_calendar
 import nutrition_advisory
 from nutrition_advisory import load_and_prepare_data, DATA_URL
-
+from progress import show_progress_page
 
 PRIMARY_GREEN = "#007A3D"  # HSG-like green
 
@@ -764,29 +763,6 @@ def show_nutrition_page():
         with st.container(border=True):
             nutrition_advisory.main()
 
-
-def show_progress_page():
-    st.header("Progress")
-    st.divider()
-
-    with st.container():
-        with st.container(border=True):
-            st.subheader("Demo progress (to be replaced with real data)")
-
-            st.write(
-                "This simple chart is a placeholder. "
-                "Later, your team can replace it with real workout or calorie data."
-            )
-
-            data = {
-                "Week": ["Week 1", "Week 2", "Week 3", "Week 4"],
-                "Workouts": [2, 3, 4, 3],
-            }
-            df = pd.DataFrame(data).set_index("Week")
-
-            st.bar_chart(df)
-
-            st.info("Your teammates can plug real data into this chart later.")
 
 
 # =========================================================
