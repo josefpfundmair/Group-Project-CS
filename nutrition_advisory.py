@@ -361,8 +361,20 @@ def show_recipe_card(
             n4.metric("Fat", f"{row['fat_g']:.1f} g")
 
             st.markdown("**Ingredients (per serving)**")
-            for line in row.get("ingredient_lines_per_serving", []):
+
+            ingredients = row.get("ingredient_lines_per_serving", [])
+
+            # Nur die ersten drei anzeigen
+            first_three = ingredients[:3]
+            for line in first_three:
                 st.markdown(f"- {line}")
+
+            # Wenn mehr als 3 Zutaten existieren → Expander anzeigen
+            if len(ingredients) > 3:
+                with st.expander("Show more ingredients"):
+                    for line in ingredients[3:]:
+                        st.markdown(f"- {line}")
+
 
             st.markdown("---")
 
@@ -371,48 +383,32 @@ def show_recipe_card(
                 if st.button("Remove from favourite recipes", key=f"rmfav_{key_prefix}"):
                     st.session_state.favourite_recipes.discard(row.name)
                 return
-
             # -------------------------- NOT EATEN YET --------------------------
+            # -------------------------- BUTTON LAYOUT --------------------------
             if not eaten:
-                colA, colB = st.columns(2)
 
-                if colA.button("I have eaten this", key=f"eat_{key_prefix}"):
+                col_left, col_mid, col_right = st.columns(3)
+
+                # Links: I have eaten this
+                if col_left.button("I have eaten this", key=f"eat_{key_prefix}"):
                     log_meal(row, meal_name)
                     st.session_state.rating_stage[recipe_name] = "none"
 
-                if colB.button("I don't like this", key=f"skip_{key_prefix}"):
+                # Mitte: I like this
+                if col_mid.button("I like this", key=f"like_{key_prefix}"):
+                    st.session_state.favourite_recipes.add(row.name)
+                    st.success("Added to favourites!")
+
+                # Rechts: I don't like this
+                if col_right.button("I don't like this", key=f"dislike_{key_prefix}"):
                     if df is not None and meal_target_calories is not None:
                         new_row = pick_meal(df, meal_name, meal_target_calories, "", pref_model)
                         if new_row is not None:
                             st.session_state.daily_plan[meal_name] = (new_row, meal_target_calories)
+
                 return
-
-            # -------------------------- RATING AFTER EATING --------------------------
-            if rating_stage == "none":
-                like, dislike = st.columns(2)
-
-                if like.button("I liked this meal", key=f"like_{key_prefix}"):
-                    if pref_model:
-                        pref_model.update_with_rating(row, +1)
-                    st.session_state.rating_stage[recipe_name] = "liked"
-
-                if dislike.button("I didn't like this meal", key=f"dislike_{key_prefix}"):
-                    if pref_model:
-                        pref_model.update_with_rating(row, -1)
-                    st.session_state.rating_stage[recipe_name] = "disliked"
-
-            elif rating_stage == "liked":
-                c1, c2 = st.columns(2)
-                if c1.button("Save in favourites", key=f"fav_{key_prefix}"):
-                    st.session_state.favourite_recipes.add(row.name)
-                    st.session_state.rating_stage[recipe_name] = "liked_saved"
-                if c2.button("Don't save", key=f"nofav_{key_prefix}"):
-                    st.session_state.rating_stage[recipe_name] = "liked_nosave"
-
-
-# =============================================================================
 # MAIN APP
-# =============================================================================
+
 def main(df=None):
     init_session_state()
 
@@ -643,7 +639,17 @@ def main(df=None):
         if not combined:
             st.info("No meals eaten today.")
         else:
-            st.table(pd.DataFrame(combined))
+            df_combined = pd.DataFrame(combined).copy()
+
+            # ---- HIER: Werte ohne Nachkommastellen ----
+            df_combined["Calories"] = df_combined["Calories"].astype(int)
+            df_combined["Protein (g)"] = df_combined["Protein (g)"].astype(int)
+
+            # ---- HIER: Index bei 1 starten ----
+            df_combined.index = df_combined.index + 1
+
+            st.table(df_combined)
+
 
         st.markdown("### Add additional meal")
 
