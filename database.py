@@ -41,15 +41,48 @@ def create_tables():
         """
     )
 
-    # Add columns if missing
+    # Add missing profile columns dynamically (safety net)
     for col in ["username", "allergies", "training_type", "diet_preferences", "gender", "goal"]:
         try:
             cur.execute(f"ALTER TABLE profiles ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
             pass
 
+    # --------------------------------------------------------------------
+    # NEW: Daily Aggregation Tables for Progress Tracking
+    # --------------------------------------------------------------------
+
+    # Daily nutrition summary table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS nutrition_daily (
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            total_calories REAL,
+            total_protein REAL,
+            target_calories REAL,
+            target_protein REAL,
+            PRIMARY KEY (user_id, date),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+    """)
+
+    # Daily workout summary table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS workout_daily (
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            sessions INTEGER DEFAULT 0,
+            total_volume REAL,
+            PRIMARY KEY (user_id, date),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+    """)
+
+    # --------------------------------------------------------------------
+
     conn.commit()
     conn.close()
+
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
