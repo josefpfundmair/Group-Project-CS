@@ -1134,25 +1134,25 @@ st.markdown(
         font-weight: 600 !important;
     }}
 
-    /* Sidebar buttons: white by default, green text + border; centered and same width */
+    /* Sidebar button container: center the buttons */
+    section[data-testid="stSidebar"] div.stButton {{
+        display: flex !important;
+        justify-content: center !important;
+        margin-bottom: 0.4rem !important;
+    }}
+
+    /* Sidebar buttons: fixed width, centered, pill style */
     section[data-testid="stSidebar"] div.stButton > button {{
-        width: 100% !important;
-        max-width: 260px !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        display: block !important;
+        width: 230px !important;
         background-color: #ffffff !important;
         color: {PRIMARY_GREEN} !important;
         border: 1px solid {PRIMARY_GREEN} !important;
         text-align: center !important;
-        justify-content: center !important;
-        padding: 0.6rem 0.75rem;
+        padding: 0.6rem 0.75rem !important;
+        border-radius: 999px !important;
     }}
     section[data-testid="stSidebar"] div.stButton > button * {{
         color: {PRIMARY_GREEN} !important;
-    }}
-    section[data-testid="stSidebar"] div.stButton {{
-        margin-bottom: 0.35rem;
     }}
 
     /* Sidebar buttons on hover/press: green background, white text */
@@ -1171,7 +1171,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
 
 if __name__ == "__main__":
     # Load recipes DataFrame once at app start
