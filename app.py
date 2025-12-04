@@ -192,24 +192,21 @@ def get_db():
 
 
 def create_tables():
-    """Create users and profiles tables; add missing columns if needed."""
+    """Create all database tables including new progress tracking tables."""
     conn = get_db()
     cur = conn.cursor()
 
-    # users table
-    cur.execute(
-        """
+    # ---------------- USERS ----------------
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL
         )
-        """
-    )
+    """)
 
-    # profiles table (base definition)
-    cur.execute(
-        """
+    # ---------------- PROFILES ----------------
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS profiles (
             user_id INTEGER UNIQUE,
             age INTEGER,
@@ -223,20 +220,43 @@ def create_tables():
             goal TEXT DEFAULT 'Maintain',
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
-        """
-    )
+    """)
 
-    # ensure new columns exist for older databases
-    additional_cols = [
+    # Add missing columns (safety)
+    for col_def in [
         "gender TEXT DEFAULT 'Male'",
-        "goal TEXT DEFAULT 'Maintain'",
-    ]
-    for col_def in additional_cols:
+        "goal TEXT DEFAULT 'Maintain'"
+    ]:
         try:
             cur.execute(f"ALTER TABLE profiles ADD COLUMN {col_def}")
         except sqlite3.OperationalError:
-            # column already exists
             pass
+
+    # ---------------- NUTRITION DAILY ----------------
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS nutrition_daily (
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            total_calories REAL,
+            total_protein REAL,
+            target_calories REAL,
+            target_protein REAL,
+            PRIMARY KEY (user_id, date),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+
+    # ---------------- WORKOUT DAILY ----------------
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS workout_daily (
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            sessions INTEGER DEFAULT 0,
+            total_volume REAL,
+            PRIMARY KEY (user_id, date),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
 
     conn.commit()
     conn.close()
