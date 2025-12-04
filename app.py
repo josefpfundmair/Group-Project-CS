@@ -1128,40 +1128,73 @@ st.markdown(
     f"""
     <style>
 
-    /* Make the entire sidebar a flex column and center all children */
+    /* ==========================================================
+       GLOBAL BUTTONS (Used inside the main page)
+       These include: Login, Register, Save Profile, Trainer actions, etc.
+       All should use white text on green background.
+    ========================================================== */
+    div.stButton > button {{
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }}
+    div.stButton > button * {{
+        color: #ffffff !important;
+    }}
+
+    /* Override Streamlit default button hover/active behavior */
+    div.stButton > button:hover,
+    div.stButton > button:active,
+    div.stButton > button:focus {{
+        color: #ffffff !important;
+    }}
+    div.stButton > button:hover *,
+    div.stButton > button:active *,
+    div.stButton > button:focus * {{
+        color: #ffffff !important;
+    }}
+
+
+    /* ==========================================================
+       SIDEBAR LAYOUT → FULL CENTERING OF ALL CONTENT
+    ========================================================== */
+
+    /* Make the whole sidebar a vertical flexbox & center everything */
     section[data-testid="stSidebar"] > div:first-child {{
         display: flex !important;
         flex-direction: column !important;
-        align-items: center !important;   /* << center horizontally */
+        align-items: center !important;    /* horizontal center */
         justify-content: flex-start !important;
     }}
 
-    /* Center the stButton wrapper itself */
+    /* Center each button block within the sidebar */
     section[data-testid="stSidebar"] div.stButton {{
-        width: 100% !important;
         display: flex !important;
-        justify-content: center !important;   /* << center wrapper */
+        justify-content: center !important;
+        width: 100% !important;
         margin-bottom: 0.45rem !important;
     }}
 
-    /* Sidebar buttons: fixed width, centered */
+    /* ==========================================================
+       SIDEBAR BUTTONS (Navigation Menu)
+       These must stay green-text on white background.
+    ========================================================== */
     section[data-testid="stSidebar"] div.stButton > button {{
-        width: 230px !important;             /* adjust if needed */
+        width: 230px !important;               /* Sidebar button width */
         background-color: #ffffff !important;
         color: {PRIMARY_GREEN} !important;
         border: 1px solid {PRIMARY_GREEN} !important;
-        text-align: center !important;
         padding: 0.55rem 0.75rem !important;
-        border-radius: 999px !important;
+        text-align: center !important;
+        border-radius: 999px !important;       /* pill shape */
         font-weight: 600 !important;
     }}
 
-    /* Ensure inner text stays green when not hovered */
+    /* Ensure text inside sidebar buttons stays green */
     section[data-testid="stSidebar"] div.stButton > button * {{
         color: {PRIMARY_GREEN} !important;
     }}
 
-    /* Hover / active states */
+    /* Sidebar button hover → green background, white text */
     section[data-testid="stSidebar"] div.stButton > button:hover,
     section[data-testid="stSidebar"] div.stButton > button:active,
     section[data-testid="stSidebar"] div.stButton > button:focus {{
