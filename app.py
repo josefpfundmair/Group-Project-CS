@@ -16,18 +16,14 @@ from nutrition_advisory import load_and_prepare_data, DATA_URL
 
 
 # =========================================================
-# BASIC PAGE SETUP
+# BASIC PAGE SETUP  (MUST BE FIRST STREAMLIT COMMAND)
 # =========================================================
 
 st.set_page_config(
     page_title="UniFit Coach",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
-
-# DataFrame only once at app start
-if "recipes_df" not in st.session_state:
-    with st.spinner("Loading recipe data..."):
-        st.session_state.recipes_df = load_and_prepare_data(DATA_URL)
 
 PRIMARY_GREEN = "#007A3D"  # HSG-like green
 
@@ -57,7 +53,7 @@ def load_logo(path: str) -> str:
 # Files must exist next to app.py
 BACKGROUND_IMAGE = get_base64_of_image("background_pitch.jpg")
 LOGO_IMAGE = load_logo("unifit_logo.png")
-PUMPFESSOR_IMAGE = load_logo("pumpfessorjoe.png")  # Pumpfessor Joe avatar
+PUMPFESSOR_IMAGE = load_logo("pumpfessorjoe.png")  # Pumpfessor How avatar
 
 
 # =========================================================
@@ -194,7 +190,7 @@ def get_db():
 
 
 def create_tables():
-    """Create users and profiles tables if they don't exist, add missing columns."""
+    """Create users and profiles tables if they don't exist."""
     conn = get_db()
     cur = conn.cursor()
 
@@ -237,9 +233,8 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-# ---------- password + email validation ----------
-
 def validate_password_strength(password: str):
+    """Check password strength rules."""
     if len(password) < 8:
         return False, "Password must be at least 8 characters long."
     if not re.search(r"[a-z]", password):
@@ -254,6 +249,7 @@ def validate_password_strength(password: str):
 
 
 def is_valid_email(email: str) -> bool:
+    """Simple email format validation."""
     pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
     return re.match(pattern, email) is not None
 
@@ -835,20 +831,21 @@ def ask_pumpfessor(question: str, user_id: int, history: list[dict]) -> str:
         {"role": "system", "content": f"User context: {user_context}"},
     ]
 
-    # Add previous turns (user/assistant) to keep short history
+    # Add recent history (last 10 turns)
     for msg in history[-10:]:
         if msg["role"] in ("user", "assistant"):
-            messages.append(
-                {"role": msg["role"], "content": msg["content"]}
-            )
+            messages.append({"role": msg["role"], "content": msg["content"]})
 
     messages.append({"role": "user", "content": question})
 
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=messages,
-    )
-    return response.choices[0].message.content.strip()
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=messages,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Pumpfessor encountered an error while generating a response: {e}"
 
 
 def show_pumpfessor_sidebar():
@@ -871,7 +868,8 @@ def show_pumpfessor_sidebar():
         if "pumpfessor_messages" not in st.session_state:
             st.session_state.pumpfessor_messages = []
 
-        for msg in st.session_state.pumpfessor_messages:
+        # Show short chat history
+        for msg in st.session_state.pumpfessor_messages[-6:]:
             if msg["role"] == "user":
                 st.sidebar.markdown(f"**You:** {msg['content']}")
             else:
@@ -897,7 +895,7 @@ def show_pumpfessor_sidebar():
 
 
 # =========================================================
-# MAIN APP
+# PAGE SLUG HELPERS (FOR URL)
 # =========================================================
 
 def slug_for_page(page_name: str) -> str:
@@ -923,6 +921,10 @@ def page_for_slug(slug: str) -> str:
     }
     return mapping.get(slug, "Profile")
 
+
+# =========================================================
+# MAIN APP
+# =========================================================
 
 def main():
     create_tables()
@@ -1148,5 +1150,10 @@ st.markdown(
 
 
 if __name__ == "__main__":
+    # DataFrame for recipes only once at app start
+    if "recipes_df" not in st.session_state:
+        with st.spinner("Loading recipe data..."):
+            st.session_state.recipes_df = load_and_prepare_data(DATA_URL)
+
     main()
 
