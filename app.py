@@ -195,7 +195,7 @@ def get_db():
 
 
 def create_tables():
-    """Create users and profiles tables if they don't exist."""
+    """Create users and profiles tables; add missing columns if needed."""
     conn = get_db()
     cur = conn.cursor()
 
@@ -210,7 +210,7 @@ def create_tables():
         """
     )
 
-    # profiles table
+    # profiles table (base definition)
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS profiles (
@@ -228,6 +228,18 @@ def create_tables():
         )
         """
     )
+
+    # ensure new columns exist for older databases
+    additional_cols = [
+        "gender TEXT DEFAULT 'Male'",
+        "goal TEXT DEFAULT 'Maintain'",
+    ]
+    for col_def in additional_cols:
+        try:
+            cur.execute(f"ALTER TABLE profiles ADD COLUMN {col_def}")
+        except sqlite3.OperationalError:
+            # column already exists
+            pass
 
     conn.commit()
     conn.close()
@@ -462,7 +474,7 @@ def show_login_page():
                         st.session_state.user_id = user_id
                         st.session_state.user_email = email
                         st.session_state.current_page = "Profile"
-                        st.experimental_set_query_params(page="profile")
+                        st.query_params["page"] = "profile"
                         st.rerun()
                     else:
                         st.error("Invalid email or password.")
@@ -519,7 +531,7 @@ def show_register_page():
                             st.session_state.user_email = email
                             st.session_state.current_page = "Profile"
                             st.success("Account created. Please complete your profile to unlock all applications.")
-                            st.experimental_set_query_params(page="profile")
+                            st.query_params["page"] = "profile"
                             st.rerun()
                         else:
                             st.error(msg)
@@ -942,7 +954,7 @@ def main():
         st.session_state.current_page = "Profile"
 
     # sync page from URL (query param)
-    params = st.experimental_get_query_params()
+    params = st.query_params
     if "page" in params:
         slug = params["page"][0]
         st.session_state.current_page = page_for_slug(slug)
@@ -1041,24 +1053,24 @@ def main():
     # navigation buttons
     if st.sidebar.button("Profile"):
         st.session_state.current_page = "Profile"
-        st.experimental_set_query_params(page=slug_for_page("Profile"))
+        st.query_params["page"] = slug_for_page("Profile")
 
     if profile_complete:
         if st.sidebar.button("Trainer"):
             st.session_state.current_page = "Trainer"
-            st.experimental_set_query_params(page=slug_for_page("Trainer"))
+            st.query_params["page"] = slug_for_page("Trainer")
         if st.sidebar.button("Calorie tracker"):
             st.session_state.current_page = "Calorie tracker"
-            st.experimental_set_query_params(page=slug_for_page("Calorie tracker"))
+            st.query_params["page"] = slug_for_page("Calorie tracker")
         if st.sidebar.button("Calories and nutrition"):
             st.session_state.current_page = "Calories & Nutrition"
-            st.experimental_set_query_params(page=slug_for_page("Calories & Nutrition"))
+            st.query_params["page"] = slug_for_page("Calories & Nutrition")
         if st.sidebar.button("Nutrition adviser"):
             st.session_state.current_page = "Nutrition adviser"
-            st.experimental_set_query_params(page=slug_for_page("Nutrition adviser"))
+            st.query_params["page"] = slug_for_page("Nutrition adviser")
         if st.sidebar.button("Progress"):
             st.session_state.current_page = "Progress"
-            st.experimental_set_query_params(page=slug_for_page("Progress"))
+            st.query_params["page"] = slug_for_page("Progress")
     else:
         st.sidebar.caption("Complete your profile to unlock the applications.")
 
@@ -1071,7 +1083,7 @@ def main():
         st.session_state.user_id = None
         st.session_state.user_email = None
         st.session_state.login_mode = "login"
-        st.experimental_set_query_params()  # clear query params
+        st.query_params.clear()  # clear query params
         st.rerun()
 
     # --------------- MAIN LAYOUT ---------------
@@ -1161,5 +1173,3 @@ if __name__ == "__main__":
             st.session_state.recipes_df = load_and_prepare_data(DATA_URL)
 
     main()
-
-
