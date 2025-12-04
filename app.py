@@ -1057,8 +1057,7 @@ def main():
         st.sidebar.caption(f"Logged in as: {st.session_state.user_email}")
         st.sidebar.write("---")
 
-    # navigation buttons
-# --- Navigation using a stable selectbox instead of buttons ---
+    # navigation buttons# --- Navigation using a stable selectbox instead of buttons ---
     menu_options = ["Profile"]
 
     if profile_complete:
@@ -1069,6 +1068,8 @@ def main():
             "Nutrition adviser",
             "Progress",
         ]
+    else:
+        st.sidebar.caption("Complete your profile to unlock the applications.")
 
     current_page = st.sidebar.selectbox(
         "Navigation",
@@ -1082,8 +1083,6 @@ def main():
     st.session_state.current_page = current_page
     st.query_params["page"] = slug_for_page(current_page)
 
-    else:
-        st.sidebar.caption("Complete your profile to unlock the applications.")
 
     # Pumpfessor Joe chatbot (under navigation, above logout)
     show_pumpfessor_sidebar()
