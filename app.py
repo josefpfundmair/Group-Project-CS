@@ -1127,35 +1127,41 @@ def main():
 st.markdown(
     f"""
     <style>
-    /* All action buttons (Login, Save profile, etc.) -> white text */
-    div.stButton > button,
-    div.stButton > button * {{
-        color: #ffffff !important;
-        font-weight: 600 !important;
-    }}
 
-    /* Sidebar button container: center the buttons */
-    section[data-testid="stSidebar"] div.stButton {{
+    /* Make the entire sidebar a flex column and center all children */
+    section[data-testid="stSidebar"] > div:first-child {{
         display: flex !important;
-        justify-content: center !important;
-        margin-bottom: 0.4rem !important;
+        flex-direction: column !important;
+        align-items: center !important;   /* << center horizontally */
+        justify-content: flex-start !important;
     }}
 
-    /* Sidebar buttons: fixed width, centered, pill style */
+    /* Center the stButton wrapper itself */
+    section[data-testid="stSidebar"] div.stButton {{
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;   /* << center wrapper */
+        margin-bottom: 0.45rem !important;
+    }}
+
+    /* Sidebar buttons: fixed width, centered */
     section[data-testid="stSidebar"] div.stButton > button {{
-        width: 230px !important;
+        width: 230px !important;             /* adjust if needed */
         background-color: #ffffff !important;
         color: {PRIMARY_GREEN} !important;
         border: 1px solid {PRIMARY_GREEN} !important;
         text-align: center !important;
-        padding: 0.6rem 0.75rem !important;
+        padding: 0.55rem 0.75rem !important;
         border-radius: 999px !important;
+        font-weight: 600 !important;
     }}
+
+    /* Ensure inner text stays green when not hovered */
     section[data-testid="stSidebar"] div.stButton > button * {{
         color: {PRIMARY_GREEN} !important;
     }}
 
-    /* Sidebar buttons on hover/press: green background, white text */
+    /* Hover / active states */
     section[data-testid="stSidebar"] div.stButton > button:hover,
     section[data-testid="stSidebar"] div.stButton > button:active,
     section[data-testid="stSidebar"] div.stButton > button:focus {{
@@ -1167,6 +1173,7 @@ st.markdown(
     section[data-testid="stSidebar"] div.stButton > button:focus * {{
         color: #ffffff !important;
     }}
+
     </style>
     """,
     unsafe_allow_html=True,
