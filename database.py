@@ -10,10 +10,11 @@ import os
 DB_DIR = ".streamlit"
 DB_PATH = os.path.join(DB_DIR, "gym_app.db")
 
-# Create folder if it doesn't exist
+# Ensure folder exists
 os.makedirs(DB_DIR, exist_ok=True)
 
 def get_db():
+    """Open a connection to the persistent SQLite DB."""
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = 1")
     return conn
@@ -27,7 +28,7 @@ def create_tables():
     conn = get_db()
     cur = conn.cursor()
 
-    # Users table
+    # Users
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +37,7 @@ def create_tables():
         )
     """)
 
-    # Profiles table
+    # Profiles
     cur.execute("""
         CREATE TABLE IF NOT EXISTS profiles (
             user_id INTEGER UNIQUE,
@@ -53,14 +54,14 @@ def create_tables():
         )
     """)
 
-    # Add missing profile columns dynamically
+    # Add missing column protection
     for col in ["username", "allergies", "training_type", "diet_preferences", "gender", "goal"]:
         try:
             cur.execute(f"ALTER TABLE profiles ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
             pass
 
-    # Daily nutrition summary table
+    # Daily nutrition summary
     cur.execute("""
         CREATE TABLE IF NOT EXISTS nutrition_daily (
             user_id INTEGER NOT NULL,
@@ -74,7 +75,7 @@ def create_tables():
         );
     """)
 
-    # Daily workout summary table
+    # Daily workout tracking
     cur.execute("""
         CREATE TABLE IF NOT EXISTS workout_daily (
             user_id INTEGER NOT NULL,
@@ -91,7 +92,7 @@ def create_tables():
 
 
 # ---------------------------------------
-# AUTH + PROFILE FUNCTIONS
+# AUTH + VALIDATION
 # ---------------------------------------
 
 def hash_password(password: str) -> str:
@@ -99,6 +100,7 @@ def hash_password(password: str) -> str:
 
 
 def validate_password_strength(password: str):
+    """Check password rules."""
     if len(password) < 8:
         return False, "Password must be at least 8 characters long."
     if not re.search(r"[a-z]", password):
@@ -115,6 +117,10 @@ def validate_password_strength(password: str):
 def is_valid_email(email: str) -> bool:
     return re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email) is not None
 
+
+# ---------------------------------------
+# USER MANAGEMENT
+# ---------------------------------------
 
 def register_user(email: str, password: str):
     conn = get_db()
@@ -147,8 +153,10 @@ def register_user(email: str, password: str):
 def verify_user(email: str, password: str):
     conn = get_db()
     cur = conn.cursor()
+
     cur.execute("SELECT id, password_hash FROM users WHERE email = ?", (email,))
     row = cur.fetchone()
+
     conn.close()
 
     if row is None:
@@ -171,13 +179,17 @@ def reset_password(email: str, new_password: str):
 
     cur.execute(
         "UPDATE users SET password_hash = ? WHERE email = ?",
-        (hash_password(new_password), email)
+        (hash_password(new_password), email),
     )
 
     conn.commit()
     conn.close()
     return True, "Password updated successfully."
 
+
+# ---------------------------------------
+# PROFILE FUNCTIONS
+# ---------------------------------------
 
 def get_profile(user_id: int):
     conn = get_db()
@@ -206,6 +218,7 @@ def get_profile(user_id: int):
             "goal": row[8] or "Maintain",
         }
 
+    # Default profile
     return {
         "age": None,
         "weight": None,
@@ -233,12 +246,15 @@ def update_profile(user_id: int, age: int, weight: float, height: float,
             training_type = ?, diet_preferences = ?,
             gender = ?, goal = ?
         WHERE user_id = ?
-    """, (age, weight, height, username, allergies, training_type, diet_preferences, gender, goal, user_id))
+    """, (age, weight, height, username, allergies, training_type,
+          diet_preferences, gender, goal, user_id))
 
     conn.commit()
     conn.close()
 
+
 def is_profile_complete(profile: dict) -> bool:
+    """Check if required fields are filled."""
     if not profile.get("username") or profile["username"].strip() == "":
         return False
     if not profile.get("age") or profile["age"] <= 0:
@@ -255,4 +271,5 @@ def is_profile_complete(profile: dict) -> bool:
         return False
     if profile.get("goal") not in ("Cut", "Maintain", "Bulk"):
         return False
+
     return True
