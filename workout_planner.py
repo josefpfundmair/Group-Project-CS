@@ -1,6 +1,8 @@
 import random            # Python's built-in module for randomness
 import pandas as pd      # Pandas for reading / processing the CSV exercise database
 import streamlit as st   # Streamlit for the web UI
+from database import get_db
+import datetime as dt
 
 # Primary brand color used consistently in headings, buttons, etc.
 PRIMARY_COLOR = "#007A3D"  # UniFit Coach green
@@ -346,6 +348,53 @@ def show_completion():
     Uses st.session_state.workout to list all performed exercises.
     """
     state = st.session_state
+    user_id = st.session_state.get("user_id")
+    if user_id:
+        today_str = dt.date.today().isoformat()
+        workout_list = state.workout
+
+        # FUNCTION: convert "6–10" into numerical average (→ 8)
+        def parse_rep_range(rep_str):
+            try:
+                if "–" in rep_str:
+                    lo, hi = rep_str.split("–")
+                elif "-" in rep_str:
+                    lo, hi = rep_str.split("-")
+                else:
+                    return float(rep_str)
+                return (float(lo) + float(hi)) / 2
+            except:
+                return 10  # fallback default
+
+        # CALCULATE SIMPLE VOLUME
+        total_volume = 0
+        for ex in workout_list:
+            sets = ex.get("sets", 1)
+            reps = parse_rep_range(ex.get("reps", "10"))
+            total_volume += sets * reps
+
+        # Cardio override (volume = minutes)
+        if workout_list and "minutes" in st.session_state.get("current_workout", {}):
+            if "minutes" in st.session_state.get("current_workout", {}) and workout_list[0]["muscle"].lower().startswith("cardio"):
+                total_volume = st.session_state["current_workout"]["minutes"]
+
+        # Store in DB (one training session per day)
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT OR REPLACE INTO workout_daily 
+            (user_id, date, sessions, total_volume)
+            VALUES (?, ?, ?, ?)
+        """, (
+            user_id,
+            today_str,
+            1,  # one session completed
+            float(total_volume)
+        ))
+
+        conn.commit()
+        conn.close()
     # Big title and congratulatory message
     st.markdown(
         f"<h2 style='color:{PRIMARY_COLOR};'>Workout Completed! 🎉</h2>",
