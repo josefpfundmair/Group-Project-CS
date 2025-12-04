@@ -5,6 +5,8 @@ from collections import Counter
 from typing import List, Optional
 from datetime import date
 from database import get_profile
+from database import get_db
+import datetime as dt
 
 import pandas as pd
 import streamlit as st
@@ -630,6 +632,27 @@ def main(df=None):
 
         total_prot = sum(m["protein"] for m in st.session_state.ct_meals) + \
                      sum(m["protein"] for m in st.session_state.meal_log)
+
+        today_str = dt.date.today().isoformat()
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT OR REPLACE INTO nutrition_daily 
+            (user_id, date, total_calories, total_protein, target_calories, target_protein)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            user_id,
+            today_str,
+            float(total_cal),
+            float(total_prot),
+            float(target_calories),
+            float(target_protein)
+        ))
+
+        conn.commit()
+        conn.close()
 
         st.markdown("### Daily targets")
         c1, c2 = st.columns(2)
