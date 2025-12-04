@@ -435,19 +435,23 @@ def update_profile(
 
 
 def is_profile_complete(profile: dict) -> bool:
-    """Return True if all required profile fields are filled."""
-    required = [
-        profile.get("username"),
-        profile.get("age"),
-        profile.get("weight"),
-        profile.get("height"),
-        profile.get("training_type"),
-        profile.get("diet_preferences"),
-        profile.get("gender"),
-        profile.get("goal"),
-    ]
-    return all(v not in (None, 0, 0.0, "", "Not set") for v in required)
-
+    if not profile.get("username") or profile["username"].strip() == "":
+        return False
+    if not profile.get("age") or profile["age"] <= 0:
+        return False
+    if not profile.get("weight") or profile["weight"] <= 0:
+        return False
+    if not profile.get("height") or profile["height"] <= 0:
+        return False
+    if profile.get("training_type") in (None, "", "Not set"):
+        return False
+    if profile.get("diet_preferences") in (None, "", "Not set"):
+        return False
+    if profile.get("gender") not in ("Male", "Female"):
+        return False
+    if profile.get("goal") not in ("Cut", "Maintain", "Bulk"):
+        return False
+    return True
 
 # =========================================================
 # AUTHENTICATION UI
