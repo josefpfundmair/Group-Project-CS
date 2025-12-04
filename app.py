@@ -1446,13 +1446,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
 if __name__ == "__main__":
-    """
-    Script entry point:
-    - Lazily loads the recipes DataFrame into session_state (once per session).
-    - Then calls main() to run the Streamlit app.
-    The recipe data is used by the nutrition adviser module.
-    """
+    # Script entry point:
+    # - Lazily loads the recipes DataFrame into session_state (once per session).
+    # - Then calls main() to run the Streamlit app.
+    #   The recipe data is used by the nutrition adviser module.
+
     # Load recipes DataFrame once at app start
     if "recipes_df" not in st.session_state:
         # Show a spinner while loading larger external data.
