@@ -10,6 +10,12 @@ import datetime as dt
 
 import pandas as pd
 import streamlit as st
+from database import (
+    add_favourite_recipe,
+    remove_favourite_recipe,
+    log_meal as db_log_meal,
+    get_today_meals,
+)
 
 # ===================== PAGE CONFIG =====================
 st.set_page_config(
@@ -290,8 +296,9 @@ def init_session_state():
     if "pref_model" not in st.session_state or not isinstance(st.session_state.pref_model, UserPreferenceModel):
         st.session_state.pref_model = UserPreferenceModel()
 
-    if "meal_log" not in st.session_state:
-        st.session_state.meal_log = []
+    user_id = st.session_state.get("user_id")
+    st.session_state.meal_log = get_today_meals(user_id) if user_id else []
+
 
     if "daily_plan" not in st.session_state:
         st.session_state.daily_plan = None
@@ -383,10 +390,10 @@ def show_recipe_card(
             # -------------------
             if mode == "favourite":
                 if st.button("Remove from favourite recipes", key=f"rmfav_{key_prefix}"):
+                    remove_favourite_recipe(st.session_state.user_id, row.name)
                     st.session_state.favourite_recipes.discard(row.name)
                     st.rerun()
                 return
-
             # -------------------
             # ACTION BUTTONS
             # -------------------
@@ -395,14 +402,29 @@ def show_recipe_card(
 
                 # ---- 1) I HAVE EATEN THIS ----
                 if col_left.button("I have eaten this", key=f"eat_{key_prefix}"):
-                    log_meal(row, meal_name)
-                    st.session_state.eaten_today.add(recipe_name)
+                    db_log_meal(
+                        st.session_state.user_id,
+                        meal_name,
+                        row["recipe_name"],
+                        row["calories_per_serving"],
+                        row["protein_g"]
+                )
+
+                    # refresh state
+                    st.session_state.meal_log = get_today_meals(st.session_state.user_id)
+                    st.session_state.eaten_today = {m["recipe_name"] for m in st.session_state.meal_log}
+
+                    st.rerun()
+
                     st.session_state.rating_stage[recipe_name] = "none"
                     st.rerun()
 
                 # ---- 2) I LIKE THIS ----
                 if col_mid.button("I like this", key=f"like_{key_prefix}"):
+                    add_favourite_recipe(st.session_state.user_id, row.name)
                     st.session_state.favourite_recipes.add(row.name)
+                    st.rerun()
+
                     st.success("Added to favourites!")
                     st.rerun()
 
