@@ -13,6 +13,7 @@ from database import (
     get_profile,
     get_db,
     add_favourite_recipe,
+    get_favourite_recipes,
     remove_favourite_recipe,
     log_meal as db_log_meal,
     get_today_meals,
