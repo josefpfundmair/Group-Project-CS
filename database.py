@@ -102,7 +102,7 @@ def create_tables():
     cur.execute("""
         CREATE TABLE IF NOT EXISTS favourite_recipes (
             user_id INTEGER,
-            recipe_id INTEGER,
+            recipe_id TEXT,
             PRIMARY KEY (user_id, recipe_id),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
