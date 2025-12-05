@@ -2,15 +2,16 @@ import ast
 import json
 from fractions import Fraction
 from collections import Counter
-from typing import List, Optional
+from typing import List
 from datetime import date
-from database import get_profile
-from database import get_db
 import datetime as dt
 
 import pandas as pd
 import streamlit as st
+
 from database import (
+    get_profile,
+    get_db,
     add_favourite_recipe,
     remove_favourite_recipe,
     log_meal as db_log_meal,
@@ -112,7 +113,6 @@ def split_quantity_from_line(line: str):
             break
     if not qty_tokens:
         return None, line
-
     qty = sum(parse_quantity_token(t) for t in qty_tokens)
     rest = " ".join(rest_tokens).strip()
     return qty, rest
@@ -127,7 +127,6 @@ def scale_ingredient_lines(lines, factor: float):
         new_qty = qty * factor
         scaled.append(f"{float_to_fraction_str(new_qty)} {rest}".strip())
     return scaled
-
 
 # =============================================================================
 # DATA HELPERS
@@ -167,6 +166,7 @@ def parse_ingredient_lines_for_display(x):
 @st.cache_data(show_spinner=True)
 def load_and_prepare_data(path_or_url: str) -> pd.DataFrame:
     df = pd.read_csv(path_or_url)
+
     df["protein_g_total"] = df["total_nutrients"].apply(lambda x: get_nutrient(x, "PROCNT"))
     df["fat_g_total"] = df["total_nutrients"].apply(lambda x: get_nutrient(x, "FAT"))
     df["carbs_g_total"] = df["total_nutrients"].apply(lambda x: get_nutrient(x, "CHOCDF"))
@@ -181,19 +181,23 @@ def load_and_prepare_data(path_or_url: str) -> pd.DataFrame:
     df["fat_g"] = df["fat_g_total"] / df["servings"]
     df["carbs_g"] = df["carbs_g_total"] / df["servings"]
 
-    fitness_df = df[
+    # --- Filter high protein + < 800 kcal ---
+    df = df[
         (df["protein_g"] >= HIGH_PROTEIN_MIN) &
         (df["calories_per_serving"] <= MAX_CALORIES_PER_SERVING)
     ].copy()
 
-    fitness_df["ingredients_list"] = fitness_df["ingredients"].apply(parse_ingredients_for_allergy)
-    fitness_df["ingredient_lines_parsed"] = fitness_df["ingredient_lines"].apply(parse_ingredient_lines_for_display)
-    fitness_df["ingredient_lines_per_serving"] = fitness_df.apply(
+    # --- Stable recipe_id ---
+    df["recipe_id"] = df.index
+
+    df["ingredients_list"] = df["ingredients"].apply(parse_ingredients_for_allergy)
+    df["ingredient_lines_parsed"] = df["ingredient_lines"].apply(parse_ingredient_lines_for_display)
+    df["ingredient_lines_per_serving"] = df.apply(
         lambda row: scale_ingredient_lines(row["ingredient_lines_parsed"], 1.0 / row["servings"]),
         axis=1
     )
-    return fitness_df
 
+    return df
 
 # =============================================================================
 # SEARCH, FILTER, PLAN
@@ -271,7 +275,6 @@ def pick_meal(df, meal_type, target_cal, training_goal, pref_model):
     else:
         base = base.sort_values("cal_diff")
 
-    # FIX: Prüfen, ob pref_model korrekt ist
     if isinstance(pref_model, UserPreferenceModel):
         base["score"] = base.apply(pref_model.score_recipe, axis=1)
         base = base.sort_values(["score", "cal_diff"], ascending=[False, True])
@@ -287,24 +290,21 @@ def recommend_daily_plan(df, daily_calories, training_goal, diet_pref, allergies
         "Dinner": (pick_meal(user_df, "dinner", daily_calories * 0.35, training_goal, pref_model), daily_calories * 0.35),
     }
 
-
 # =============================================================================
 # SESSION STATE
 # =============================================================================
 def init_session_state():
-    # FIX: pref_model immer korrekt erzwingen
     if "pref_model" not in st.session_state or not isinstance(st.session_state.pref_model, UserPreferenceModel):
         st.session_state.pref_model = UserPreferenceModel()
 
     user_id = st.session_state.get("user_id")
     st.session_state.meal_log = get_today_meals(user_id) if user_id else []
 
-
     if "daily_plan" not in st.session_state:
         st.session_state.daily_plan = None
 
     if "eaten_today" not in st.session_state:
-        st.session_state.eaten_today = set()
+        st.session_state.eaten_today = {m["recipe_name"] for m in st.session_state.meal_log}
 
     if "rating_stage" not in st.session_state:
         st.session_state.rating_stage = {}
@@ -312,22 +312,9 @@ def init_session_state():
     if "ct_meals" not in st.session_state:
         st.session_state.ct_meals = []
 
+    # Favourites loaded from DB:
     if "favourite_recipes" not in st.session_state:
-        st.session_state.favourite_recipes = set()
-
-
-# =============================================================================
-# MEAL LOGGING
-# =============================================================================
-def log_meal(row: pd.Series, meal_name: str):
-    st.session_state.meal_log.append({
-        "date_str": date.today().strftime("%d/%m/%Y"),
-        "meal": row["recipe_name"],
-        "calories": row["calories_per_serving"],
-        "protein": row["protein_g"],
-    })
-    st.session_state.eaten_today.add(row["recipe_name"])
-
+        st.session_state.favourite_recipes = set(get_favourite_recipes(user_id)) if user_id else set()
 
 # =============================================================================
 # RECIPE CARD
@@ -348,19 +335,15 @@ def show_recipe_card(
 
     recipe_name = row["recipe_name"]
     eaten = recipe_name in st.session_state.eaten_today
+    recipe_id = row["recipe_id"]
 
     with st.container():
         col_left, col_right = st.columns([1, 5])
 
-        # IMAGE
         with col_left:
             img_url = row.get("image_url", "")
-            if img_url:
-                st.image(img_url, width=240)
-            else:
-                st.write("No image available")
+            st.image(img_url, width=240) if img_url else st.write("No image available")
 
-        # INFO
         with col_right:
             st.subheader(recipe_name)
 
@@ -371,11 +354,8 @@ def show_recipe_card(
             n4.metric("Fat", f"{row['fat_g']:.1f} g")
 
             st.markdown("**Ingredients (per serving)**")
-
             ingredients = row.get("ingredient_lines_per_serving", [])
-
-            first_three = ingredients[:3]
-            for line in first_three:
+            for line in ingredients[:3]:
                 st.markdown(f"- {line}")
 
             if len(ingredients) > 3:
@@ -385,77 +365,53 @@ def show_recipe_card(
 
             st.markdown("---")
 
-            # -------------------
             # FAVOURITE MODE
-            # -------------------
             if mode == "favourite":
                 if st.button("Remove from favourite recipes", key=f"rmfav_{key_prefix}"):
-                    remove_favourite_recipe(st.session_state.user_id, row.name)
-                    st.session_state.favourite_recipes.discard(row.name)
+                    remove_favourite_recipe(st.session_state.user_id, recipe_id)
+                    st.session_state.favourite_recipes.discard(recipe_id)
                     st.rerun()
                 return
-            # -------------------
-            # ACTION BUTTONS
-            # -------------------
-            if not eaten:
-                col_left, col_mid, col_right = st.columns(3)
 
-                # ---- 1) I HAVE EATEN THIS ----
+            # ACTION BUTTONS
+            col_left, col_mid, col_right = st.columns(3)
+
+            if not eaten:
+                # EAT
                 if col_left.button("I have eaten this", key=f"eat_{key_prefix}"):
                     db_log_meal(
                         st.session_state.user_id,
                         meal_name,
-                        row["recipe_name"],
+                        recipe_name,
                         row["calories_per_serving"],
                         row["protein_g"]
-                )
-
-                    # refresh state
+                    )
                     st.session_state.meal_log = get_today_meals(st.session_state.user_id)
                     st.session_state.eaten_today = {m["recipe_name"] for m in st.session_state.meal_log}
-
                     st.rerun()
 
-                    st.session_state.rating_stage[recipe_name] = "none"
-                    st.rerun()
-
-                # ---- 2) I LIKE THIS ----
+                # LIKE
                 if col_mid.button("I like this", key=f"like_{key_prefix}"):
-                    add_favourite_recipe(st.session_state.user_id, row.name)
-                    st.session_state.favourite_recipes.add(row.name)
+                    add_favourite_recipe(st.session_state.user_id, recipe_id)
+                    st.session_state.favourite_recipes.add(recipe_id)
                     st.rerun()
 
-                    st.success("Added to favourites!")
-                    st.rerun()
-
-                # ---- 3) I DON'T LIKE THIS → NEW SUGGESTION ----
+                # DISLIKE → new suggestion
                 if col_right.button("I don't like this", key=f"dislike_{key_prefix}"):
                     if df is not None and meal_target_calories is not None:
-
-                        meal_type = meal_name.lower()   # critical fix!
-
-                        new_row = pick_meal(
-                            df,
-                            meal_type,
-                            meal_target_calories,
-                            "",
-                            pref_model,
-                        )
-
+                        meal_type = meal_name.lower()
+                        new_row = pick_meal(df, meal_type, meal_target_calories, "", pref_model)
                         if new_row is not None:
-                            st.session_state.daily_plan[meal_name] = (
-                                new_row,
-                                meal_target_calories,
-                            )
-
+                            st.session_state.daily_plan[meal_name] = (new_row, meal_target_calories)
                     st.rerun()
 
+# =============================================================================
 # MAIN APP
-
+# =============================================================================
 def main(df=None):
     init_session_state()
 
-    # Load data
+    # Load recipe data
     if df is None:
         df = st.session_state.get("recipes_df")
     if df is None:
@@ -463,17 +419,15 @@ def main(df=None):
         df = load_and_prepare_data(DATA_URL)
         st.session_state.recipes_df = df
 
-    # Load real daily calories from calorie tracker (fallback = 2000)
     daily_cal = st.session_state.get("daily_target_calories", 2000)
 
     profile = {
         "daily_calories": daily_cal,
-        "training_goal": "strength",   # Kann später dynamisch werden
+        "training_goal": "strength",
         "diet_pref": "omnivore",
         "allergies": [],
-    }    
+    }
 
-    # ---------------------- TABS ----------------------
     tab_caltracker, tab_suggested, tab_search, tab_fav = st.tabs([
         "Calorie Tracker",
         "Suggested recipes",
@@ -481,9 +435,7 @@ def main(df=None):
         "Favourite recipes",
     ])
 
-    # =====================================================
-    # SUGGESTED RECIPES
-    # =====================================================
+    # ---------------- SUGGESTED ----------------
     with tab_suggested:
         st.subheader("Suggested recipes for today")
 
@@ -514,9 +466,7 @@ def main(df=None):
                     target_cal,
                 )
 
-    # =====================================================
-    # SEARCH
-    # =====================================================
+    # ---------------- SEARCH ----------------
     with tab_search:
         st.subheader("Search recipes")
 
@@ -552,23 +502,21 @@ def main(df=None):
             for idx, row in results.head(20).iterrows():
                 show_recipe_card(row, f"search_{idx}", "Search", "default", df, None, st.session_state.pref_model)
 
-    # =====================================================
-    # FAVOURITES
-    # =====================================================
+    # ---------------- FAVOURITES ----------------
     with tab_fav:
         st.subheader("Favourite recipes")
 
         fav_indices = list(st.session_state.get("favourite_recipes", []))
+
         if not fav_indices:
             st.write("You have no favourite recipes yet.")
         else:
-            for idx in fav_indices:
-                if idx in df.index:
-                    show_recipe_card(df.loc[idx], f"fav_{idx}", "Favourite", "favourite")
+            for recipe_id in fav_indices:
+                row = df[df["recipe_id"] == recipe_id]
+                if not row.empty:
+                    show_recipe_card(row.iloc[0], f"fav_{recipe_id}", "Favourite", "favourite")
 
-    # =====================================================
-    # CALORIE TRACKER
-    # =====================================================
+    # ---------------- CALORIE TRACKER ----------------
     with tab_caltracker:
         st.subheader("Calorie Tracker")
 
@@ -608,10 +556,7 @@ def main(df=None):
             duration = workout.get("minutes", 0)
 
             kraft_keywords = ["push", "pull", "leg", "full body", "upper", "lower"]
-            if any(k in w_title for k in kraft_keywords):
-                training_type = "kraft"
-            else:
-                training_type = "kraft"
+            training_type = "kraft" if any(k in w_title for k in kraft_keywords) else "kraft"
 
             st.success(f"Today's workout: **{workout['title']}** — {duration} min")
 
@@ -692,7 +637,7 @@ def main(df=None):
 
         for m in recipe_meals:
             combined.append({
-                "Meal": m["meal"],
+                "Meal": m["meal_name"],
                 "Calories": m["calories"],
                 "Protein (g)": m["protein"]
             })
@@ -708,16 +653,10 @@ def main(df=None):
             st.info("No meals eaten today.")
         else:
             df_combined = pd.DataFrame(combined).copy()
-
-            # ---- HIER: Werte ohne Nachkommastellen ----
             df_combined["Calories"] = df_combined["Calories"].astype(int)
             df_combined["Protein (g)"] = df_combined["Protein (g)"].astype(int)
-
-            # ---- HIER: Index bei 1 starten ----
             df_combined.index = df_combined.index + 1
-
             st.table(df_combined)
-
 
         st.markdown("### Add additional meal")
 
