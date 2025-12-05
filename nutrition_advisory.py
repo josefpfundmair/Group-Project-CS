@@ -19,13 +19,7 @@ from database import (
     get_today_meals,
 )
 
-# ===================== PAGE CONFIG =====================
-st.set_page_config(
-    page_title="Nutrition Advisory",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
+# ===================== Styling =====================
 st.markdown(
     """
     <style>
@@ -40,10 +34,7 @@ st.markdown(
 # =============================================================================
 # CONFIG
 # =============================================================================
-DATA_URL = (
-    "https://huggingface.co/datasets/datahiveai/recipes-with-nutrition"
-    "/resolve/main/recipes-with-nutrition.csv"
-)
+CSV_FILE = "recipes-with-nutrition.csv"
 
 HIGH_PROTEIN_MIN = 25
 MAX_CALORIES_PER_SERVING = 800
@@ -166,7 +157,14 @@ def parse_ingredient_lines_for_display(x):
 
 
 @st.cache_data(show_spinner=True)
-def load_and_prepare_data(path_or_url: str) -> pd.DataFrame:
+def load_and_prepare_data(csv_filename: str = CSV_FILE) -> pd.DataFrame:
+    base_dir = Path(__file__).parent
+    csv_path = base_dir / csv_filename
+
+    if not csv_path.exists():
+        st.error(f"CSV-Datei nicht gefunden: {csv_path}")
+        raise FileNotFoundError(csv_path)
+    
     df = pd.read_csv(path_or_url)
 
     df["protein_g_total"] = df["total_nutrients"].apply(lambda x: get_nutrient(x, "PROCNT"))
