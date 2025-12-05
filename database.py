@@ -54,7 +54,7 @@ def create_tables():
         )
     """)
 
-    # Add missing column protection
+    # Add missing columns safely
     for col in ["username", "allergies", "training_type", "diet_preferences", "gender", "goal"]:
         try:
             cur.execute(f"ALTER TABLE profiles ADD COLUMN {col} TEXT")
@@ -87,13 +87,34 @@ def create_tables():
         );
     """)
 
+    # ⭐ ADD THIS INSIDE THE FUNCTION ⭐
+    # Favourite Recipes
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS favourite_recipes (
+            user_id INTEGER,
+            recipe_id INTEGER,
+            PRIMARY KEY (user_id, recipe_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+
+    # Meal Log (reset daily)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS meal_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            meal_name TEXT,
+            recipe_name TEXT,
+            calories REAL,
+            protein REAL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+
     conn.commit()
     conn.close()
 
-
-# ---------------------------------------
-# AUTH + VALIDATION
-# ---------------------------------------
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
