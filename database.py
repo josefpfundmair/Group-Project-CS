@@ -273,3 +273,116 @@ def is_profile_complete(profile: dict) -> bool:
         return False
 
     return True
+    # Favourite Recipes
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS favourite_recipes (
+            user_id INTEGER,
+            recipe_id INTEGER,
+            PRIMARY KEY (user_id, recipe_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+
+    # Meal Log (reset daily)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS meal_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            meal_name TEXT,
+            recipe_name TEXT,
+            calories REAL,
+            protein REAL,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+# ---------------------------------------
+# FAVOURITE RECIPES
+# ---------------------------------------
+
+def add_favourite_recipe(user_id: int, recipe_id: int):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT OR IGNORE INTO favourite_recipes (user_id, recipe_id)
+        VALUES (?, ?)
+    """, (user_id, recipe_id))
+    conn.commit()
+    conn.close()
+
+
+def remove_favourite_recipe(user_id: int, recipe_id: int):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        DELETE FROM favourite_recipes
+        WHERE user_id = ? AND recipe_id = ?
+    """, (user_id, recipe_id))
+    conn.commit()
+    conn.close()
+
+
+def get_favourite_recipes(user_id: int):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT recipe_id
+        FROM favourite_recipes
+        WHERE user_id = ?
+    """, (user_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+# ---------------------------------------
+# MEAL LOG (DAILY RESET)
+# ---------------------------------------
+
+from datetime import date
+
+def log_meal(user_id: int, meal_name: str, recipe_name: str, calories: float, protein: float):
+    today = date.today().isoformat()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Delete old entries if the date changed
+    cur.execute("""
+        DELETE FROM meal_log
+        WHERE user_id = ? AND date != ?
+    """, (user_id, today))
+
+    # Insert new meal entry
+    cur.execute("""
+        INSERT INTO meal_log (user_id, date, meal_name, recipe_name, calories, protein)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (user_id, today, meal_name, recipe_name, calories, protein))
+
+    conn.commit()
+    conn.close()
+
+
+def get_today_meals(user_id: int):
+    today = date.today().isoformat()
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT meal_name, recipe_name, calories, protein
+        FROM meal_log
+        WHERE user_id = ? AND date = ?
+    """, (user_id, today))
+    
+    rows = cur.fetchall()
+    conn.close()
+
+    # Return formatted dicts
+    return [
+        {
+            "meal_name": r[0],
+            "recipe_name": r[1],
+            "calories": r[2],
+            "protein": r[3],
+        }
+        for r in rows
+    ]
