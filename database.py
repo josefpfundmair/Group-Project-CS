@@ -2,6 +2,7 @@ import sqlite3
 import hashlib
 import re
 import os
+from datetime import date
 
 # ---------------------------------------
 # PERSISTENT DATABASE PATH FOR STREAMLIT
@@ -28,7 +29,9 @@ def create_tables():
     conn = get_db()
     cur = conn.cursor()
 
+    # ----------------------
     # Users
+    # ----------------------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +40,9 @@ def create_tables():
         )
     """)
 
+    # ----------------------
     # Profiles
+    # ----------------------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS profiles (
             user_id INTEGER UNIQUE,
@@ -61,7 +66,9 @@ def create_tables():
         except sqlite3.OperationalError:
             pass
 
-    # Daily nutrition summary
+    # ----------------------
+    # Daily Nutrition Summary
+    # ----------------------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS nutrition_daily (
             user_id INTEGER NOT NULL,
@@ -75,7 +82,9 @@ def create_tables():
         );
     """)
 
-    # Daily workout tracking
+    # ----------------------
+    # Daily Workout Tracking
+    # ----------------------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS workout_daily (
             user_id INTEGER NOT NULL,
@@ -87,8 +96,9 @@ def create_tables():
         );
     """)
 
-    # ⭐ ADD THIS INSIDE THE FUNCTION ⭐
+    # ----------------------
     # Favourite Recipes
+    # ----------------------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS favourite_recipes (
             user_id INTEGER,
@@ -98,7 +108,9 @@ def create_tables():
         )
     """)
 
-    # Meal Log (reset daily)
+    # ----------------------
+    # Meal Log — stored daily
+    # ----------------------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS meal_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,6 +127,10 @@ def create_tables():
     conn.commit()
     conn.close()
 
+
+# ---------------------------------------
+# AUTH + VALIDATION
+# ---------------------------------------
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
@@ -154,6 +170,7 @@ def register_user(email: str, password: str):
         )
         user_id = cur.lastrowid
 
+        # Create empty profile
         cur.execute("""
             INSERT INTO profiles (
                 user_id, age, weight, height, username,
@@ -177,7 +194,6 @@ def verify_user(email: str, password: str):
 
     cur.execute("SELECT id, password_hash FROM users WHERE email = ?", (email,))
     row = cur.fetchone()
-
     conn.close()
 
     if row is None:
@@ -239,7 +255,6 @@ def get_profile(user_id: int):
             "goal": row[8] or "Maintain",
         }
 
-    # Default profile
     return {
         "age": None,
         "weight": None,
@@ -276,7 +291,7 @@ def update_profile(user_id: int, age: int, weight: float, height: float,
 
 def is_profile_complete(profile: dict) -> bool:
     """Check if required fields are filled."""
-    if not profile.get("username") or profile["username"].strip() == "":
+    if not profile.get("username"):
         return False
     if not profile.get("age") or profile["age"] <= 0:
         return False
@@ -294,29 +309,8 @@ def is_profile_complete(profile: dict) -> bool:
         return False
 
     return True
-    # Favourite Recipes
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS favourite_recipes (
-            user_id INTEGER,
-            recipe_id INTEGER,
-            PRIMARY KEY (user_id, recipe_id),
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-    """)
 
-    # Meal Log (reset daily)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS meal_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            date TEXT NOT NULL,
-            meal_name TEXT,
-            recipe_name TEXT,
-            calories REAL,
-            protein REAL,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-    """)
+
 # ---------------------------------------
 # FAVOURITE RECIPES
 # ---------------------------------------
@@ -355,11 +349,10 @@ def get_favourite_recipes(user_id: int):
     conn.close()
     return [r[0] for r in rows]
 
+
 # ---------------------------------------
 # MEAL LOG (DAILY RESET)
 # ---------------------------------------
-
-from datetime import date
 
 def log_meal(user_id: int, meal_name: str, recipe_name: str, calories: float, protein: float):
     today = date.today().isoformat()
@@ -367,13 +360,13 @@ def log_meal(user_id: int, meal_name: str, recipe_name: str, calories: float, pr
     conn = get_db()
     cur = conn.cursor()
 
-    # Delete old entries if the date changed
+    # Delete older entries for this user
     cur.execute("""
         DELETE FROM meal_log
         WHERE user_id = ? AND date != ?
     """, (user_id, today))
 
-    # Insert new meal entry
+    # Insert today's meal
     cur.execute("""
         INSERT INTO meal_log (user_id, date, meal_name, recipe_name, calories, protein)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -393,11 +386,10 @@ def get_today_meals(user_id: int):
         FROM meal_log
         WHERE user_id = ? AND date = ?
     """, (user_id, today))
-    
+
     rows = cur.fetchall()
     conn.close()
 
-    # Return formatted dicts
     return [
         {
             "meal_name": r[0],
