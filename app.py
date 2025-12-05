@@ -24,7 +24,7 @@ from openai import OpenAI  # OpenAI client
 import workout_planner
 import workout_calendar
 import nutrition_advisory
-from nutrition_advisory import load_and_prepare_data, DATA_URL
+from nutrition_advisory import load_and_prepare_data, CSV_FILE
 from progress import show_progress_page
 from database import (
     get_db,
@@ -903,6 +903,6 @@ if __name__ == "__main__":
     # Load recipes DataFrame once at app start
     if "recipes_df" not in st.session_state:
         with st.spinner("Loading recipe data..."):
-            st.session_state.recipes_df = load_and_prepare_data(DATA_URL)
+            st.session_state.recipes_df = load_and_prepare_data(CSV_FILE)
 
     main()
