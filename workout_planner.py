@@ -395,6 +395,10 @@ def show_completion():
     Uses st.session_state.workout to list all exercises that were performed.
     """
     state = st.session_state
+
+    # Save completed workout so other modules (e.g. calorie tracker) can use it
+    st.session_state["completed_workout"] = st.session_state.get("current_workout")
+
     # Heading and congratulation message
     st.markdown(
         f"<h2 style='color:{PRIMARY_COLOR};'>Workout Completed! 🎉</h2>",
