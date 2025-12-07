@@ -1,9 +1,14 @@
 # workout_calendar.py
+
 import calendar
 import datetime
 import streamlit as st
 from streamlit import session_state as state
+
+from database import get_db  # for syncing with workout_daily in SQLite
+
 PRIMARY_COLOR = "#007A3D"
+
 # Weekday labels matching datetime.weekday() (Mon=0..Sun=6)
 WEEKDAYS = [
     ("Monday", 0),
@@ -14,6 +19,7 @@ WEEKDAYS = [
     ("Saturday", 5),
     ("Sunday", 6),
 ]
+
 # Workout types shown in the dropdown
 WORKOUT_TYPES = [
     "Push day",
@@ -23,6 +29,7 @@ WORKOUT_TYPES = [
     "Lower body",
     "Cardio",
 ]
+
 def _init_state():
     """
     Ensure required keys exist in Streamlit session_state.
@@ -35,6 +42,67 @@ def _init_state():
     # The date the user is currently editing in the calendar
     if "selected_date" not in state:
         state.selected_date = datetime.date.today()
+
+def _save_workout_to_db(date_key: str, minutes: int, workout_type: str):
+    """
+    Write or update the SQL table workout_daily so the Progress page
+    can read training data.
+
+    - Each time you click "Save workout", the number of sessions for
+      that date is incremented by 1.
+    - total_volume stores the sum of all minutes for that date.
+    """
+    user_id = st.session_state.get("user_id")
+    if not user_id:
+        # Should not happen (calendar is only shown when logged in),
+        # but we guard against missing user_id anyway.
+        return
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Check if the user already has an entry for this date
+    cur.execute(
+        """
+        SELECT sessions, total_volume
+        FROM workout_daily
+        WHERE user_id = ? AND date = ?
+        """,
+        (user_id, date_key),
+    )
+    row = cur.fetchone()
+
+    new_minutes = int(minutes)
+
+    if row:
+        # Update existing row: increment sessions and add minutes
+        sessions, total_volume = row
+        sessions = sessions or 0
+        total_volume = total_volume or 0
+        sessions += 1
+        total_volume += new_minutes
+
+        cur.execute(
+            """
+            UPDATE workout_daily
+            SET sessions = ?, total_volume = ?
+            WHERE user_id = ? AND date = ?
+            """,
+            (sessions, total_volume, user_id, date_key),
+        )
+    else:
+        # Insert new row for this date
+        cur.execute(
+            """
+            INSERT INTO workout_daily (user_id, date, sessions, total_volume)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, date_key, 1, new_minutes),
+        )
+
+    conn.commit()
+    conn.close()
+
 def _render_month(year: int, month: int):
     """
     Render one month grid with clickable days and workout summaries.
@@ -46,8 +114,10 @@ def _render_month(year: int, month: int):
     # Calendar with weeks starting on Monday (0)
     cal = calendar.Calendar(firstweekday=0)
     month_name = calendar.month_name[month]
+
     # Month title
     st.markdown(f"#### {month_name} {year}")
+
     # Weekday header row (short labels like "Mo", "Tu", ...)
     header_cols = st.columns(7)
     for col, (name, _) in zip(header_cols, WEEKDAYS):
@@ -56,6 +126,7 @@ def _render_month(year: int, month: int):
             f"color:#555; font-weight:600;'>{name[:2]}</div>",
             unsafe_allow_html=True,
         )
+
     # cal.monthdatescalendar returns weeks; each week is 7 date objects
     for week in cal.monthdatescalendar(year, month):
         # Create 7 equal-width columns for this week
@@ -68,12 +139,14 @@ def _render_month(year: int, month: int):
                 with col:
                     st.write("")  # keep grid spacing but show nothing
                 continue
+
             date_str = date_obj.isoformat()  # "YYYY-MM-DD"
             # Retrieve any saved workout for this date
             log = state.workout_logs.get(date_str)
             # Check if this is the date currently selected in state
             is_selected = state.selected_date == date_obj
             day_label = str(date_obj.day)
+
             with col:
                 # Display "Selected" flag above the button for the active day
                 if is_selected:
@@ -82,6 +155,7 @@ def _render_month(year: int, month: int):
                         f"color:{PRIMARY_COLOR};'>Selected</div>",
                         unsafe_allow_html=True,
                     )
+
                 # Main day button: clicking it updates selected_date
                 # use_container_width=True makes it fill the column
                 if st.button(
@@ -90,11 +164,13 @@ def _render_month(year: int, month: int):
                     use_container_width=True,
                 ):
                     state.selected_date = date_obj
+
                 # If we have data for this day, show a one-line summary under the button
                 if log:
                     minutes = log.get("minutes")
                     wtype = log.get("type")
                     st.caption(f"{minutes} min – {wtype}")
+
 def main():
     """
     Main UI: calendars + workout form + recent workouts.
@@ -102,23 +178,27 @@ def main():
     from your Streamlit entry point.
     """
     _init_state()
+
     # Short instructions at the top
     st.subheader("Workout log calendar")
     st.caption(
-        "Log your past workouts in a calendar view. "
-        "Click on a date to add or edit the workout for that day."
+        "Click on a date to add or edit your workout. "
+        "Workouts are automatically saved for Progress tracking."
     )
     st.info(
-        "You always see the current month plus the previous two months (3 months of past workouts)."
+        "You always see the current month plus the previous two months "
+        "(3 months of past workouts)."
     )
     st.divider()
-    
+
     # Calendar section: compute which months to render
     today = datetime.date.today()
     # Convert (year, month) into a single integer "month index":
     # This makes going back N months just basic integer arithmetic.
     base_index = today.year * 12 + (today.month - 1)
     months_to_show = 3  # current month + 2 previous
+
+    # Render the calendar for the last 3 months
     for offset in range(months_to_show):
         # offset=0 -> current month, 1 -> previous month, 2 -> two months ago
         idx = base_index - offset
@@ -126,6 +206,7 @@ def main():
         month = (idx % 12) + 1          # reconstruct month (1..12)
         _render_month(year, month)
         st.write("")  # vertical spacing between month blocks
+
     st.divider()
 
     # Workout form for the currently selected day
@@ -133,14 +214,18 @@ def main():
     # Human-readable date, e.g. "Monday, 01 December 2025"
     selected_str = selected_date.strftime("%A, %d %B %Y")
     st.markdown(f"### Log workout for {selected_str}")
+
     # Key used in workout_logs dict
     date_key = selected_date.isoformat()
+
     # Retrieve previous values (if any) for this day
     existing_log = state.workout_logs.get(date_key, {})
     existing_minutes = existing_log.get("minutes", 0)
     existing_type = existing_log.get("type", WORKOUT_TYPES[0])
+
     # Two-column layout: left = duration, right = workout type
     col_minutes, col_type = st.columns([1, 1])
+
     with col_minutes:
         minutes = st.number_input(
             "Workout length (minutes)",
@@ -151,6 +236,7 @@ def main():
             help="How long did you train on this day?",
             key="minutes_input",
         )
+
     with col_type:
         # If saved type not in WORKOUT_TYPES (list changed), fall back to first entry
         if existing_type not in WORKOUT_TYPES:
@@ -162,13 +248,18 @@ def main():
             help="What kind of workout did you do?",
             key="workout_type_select",
         )
+
     # Save / update entry when button is pressed
     if st.button("Save workout", type="primary"):
-        # Overwrite or create log entry for this date
+        # Overwrite or create log entry for this date in session_state
         state.workout_logs[date_key] = {
             "minutes": int(minutes),
             "type": workout_type,
         }
+
+        # Also sync to the database so the Progress page can read it
+        _save_workout_to_db(date_key, int(minutes), workout_type)
+
         st.success(f"Saved workout for {selected_str}.")
 
     # Recent workouts list (optional)
