@@ -3,9 +3,8 @@ import random            # Python's built-in module for randomness
 import pandas as pd      # Pandas for reading / processing the CSV exercise database
 import streamlit as st   # Streamlit for the web UI
 
-# GLOBAL CONSTANTS
-# Primary brand color used consistently in headings, buttons, etc.
-# This is used in several HTML/CSS snippets to keep the visual style uniform.
+# CONSTANTS
+# Primary brand color used consistently
 PRIMARY_COLOR = "#007A3D"  # UniFit Coach green
 
 # DATA LOADING
@@ -23,11 +22,8 @@ def load_exercises(csv_path: str):
         - obviously invalid rows are removed
     """
     # Read the CSV file.
-    # - encoding="latin1" accepts many special characters from Excel exports
-    # - sep=None, engine="python" lets pandas auto-detect separator (',' or ';')
     df = pd.read_csv(csv_path, encoding="latin1", sep=None, engine="python")
     # Normalize column names by stripping extra spaces.
-    # Example: " Exercise " -> "Exercise"
     df.columns = [c.strip() for c in df.columns]
     # Strip whitespace from string values in every column that holds text.
     for col in df.columns:
@@ -36,29 +32,22 @@ def load_exercises(csv_path: str):
             df[col] = df[col].astype(str).str.strip()
 
     # Map potentially different column names to a unified schema.
-    # For example, "Exercise Name", "Exercise", "Exercises" -> "Exercise"
     rename = {}
     for c in df.columns:
         name = c.lower()
-        # Any column that starts with "exercise..." is treated as "Exercise"
         if name.startswith("exercise"):
             rename[c] = "Exercise"
-        # Any column that starts with "equipment..." becomes "Equipment Required"
         elif name.startswith("equipment"):
             rename[c] = "Equipment Required"
-        # Any column that starts with "muscle..." becomes "Muscle Group"
         elif name.startswith("muscle"):
             rename[c] = "Muscle Group"
-        # Any column that starts with "link..." becomes "Link"
         elif name.startswith("link"):
             rename[c] = "Link"
     # Apply the renaming dictionary to the DataFrame
     df = df.rename(columns=rename)
     # Drop rows where we are missing the exercise name OR the muscle group.
-    # These rows are considered invalid for building workouts.
     df = df.dropna(subset=["Exercise", "Muscle Group"])
-    # Some messy CSVs may literally contain the string "nan".
-    # We additionally filter those out.
+    # Some messy CSVs may literally contain the string "nan", filter these out in that case
     df = df[df["Exercise"].str.lower() != "nan"]
     df = df[df["Muscle Group"].str.lower() != "nan"]
     # Because of @st.cache_data, Streamlit caches this result. The CSV is not
@@ -124,11 +113,9 @@ def get_soreness_options(title: str) -> list[str]:
     affect how exercises are scored, except indirectly via
     `apply_soreness_adjustment`.
     Parameters
-    --
     title : str
         Name of the workout type (e.g. "Push Day").
     Returns
-    --
     list[str]
         List of muscle groups that should be offered as "sore" options.
     """
@@ -169,7 +156,6 @@ def compute_num_exercises(minutes, intensity):
     Idea:
     - Base: ~1 exercise per 8 minutes
     - More intense workouts can contain slightly more exercises
-    - Always clamp to a reasonable range
     """
     # Base count: about 1 exercise for every 8 minutes
     base = max(3, min(10, round(minutes / 8)))
@@ -180,7 +166,7 @@ def compute_num_exercises(minutes, intensity):
     if intensity == "Moderate":
         # No change for moderate intensity
         return base
-    # "Max effort" -> a bit more volume, but capped at 12 exercises
+    # "Max effort" -> a bit more volume, capped at 12 exercises
     return min(12, int(base * 1.2))
 def score_exercise(row, targets):
     """
@@ -226,8 +212,7 @@ def apply_soreness_adjustment(exercises, sore_muscles):
     """
     Adjust the workout based on sore muscle groups.
     Rule:
-    - For each sore muscle group, remove at most ONE exercise for that group
-      from the planned workout.
+    - For each sore muscle group, remove ONE exercise for selected group
     Parameters
     exercises : list[dict]
         List of exercise dictionaries that make up the planned workout.
@@ -275,18 +260,15 @@ def build_workout_plan(df, title, minutes, sore_muscles, intensity):
         A list of exercise dictionaries. Each dictionary will contain:
         - name, muscle, equipment, sets, reps, rest, link
     """
-    # Special handling for CARDIO WORKOUT
-    # For cardio, we just choose a single exercise and give it the full time.
+    # Special handling for CARDIO WORKOUT - choose a single exercise for full time
     if title.lower().strip() == "cardio":
         # Filter the DataFrame to only cardio exercises.
-        # This assumes the muscle group column uses something containing "cardio".
         df_cardio = df[df["Muscle Group"].str.contains("cardio", case=False, na=False)]
         # If the DB has no cardio entries, we cannot build a plan
         if df_cardio.empty:
             return []
         # Randomly pick ONE cardio exercise
         row = df_cardio.sample(1).iloc[0]
-        # Build a single-exercise workout where the "reps" field shows minutes
         exercises = [
             {
                 "name": row["Exercise"],
@@ -332,16 +314,14 @@ def build_workout_plan(df, title, minutes, sore_muscles, intensity):
                 "link": r.get("Link", ""),
             }
         )
-    # Apply soreness rule AFTER constructing the list:
-    # one fewer exercise per sore muscle group
+    # Apply soreness rule after constructing the list:
     exercises = apply_soreness_adjustment(exercises, sore_muscles)
     return exercises
     
 # FLASHCARD VIEW (MAIN WORKOUT EXECUTION UI)
 def show_flashcards():
     """
-    Display the current exercise as a "flashcard" and provide navigation
-    buttons to move between exercises.
+    Display the current exercise as a "flashcard" and provide navigation buttons
     Session state variables used
     - st.session_state.workout     : list of exercise dicts
     - st.session_state.current_card: integer index of the current exercise
@@ -389,8 +369,7 @@ def show_flashcards():
     # LEFT COLUMN: "Previous Exercise" button (hidden on first exercise)
     with col_prev:
         if not is_first:
-            # Use a non-breaking space between "Previous" and "Exercise"
-            # so Streamlit doesn't wrap them on two lines.
+            # Use a non-breaking space between "Previous" and "Exercise" --> Streamlit doesn't wrap them on two lines.
             prev_label = "👈 Previous\u00A0Exercise"
             if st.button(prev_label):
                 # Decrease the index and re-run app to show the previous exercise
@@ -406,7 +385,6 @@ def show_flashcards():
             else:
                 # Otherwise just move to the next exercise
                 state.current_card += 1
-
             # Trigger a rerun so the UI updates
             st.rerun()
             
@@ -461,11 +439,9 @@ def main():
         * or the workout builder form (initial state).
     """
     state = st.session_state
-    # Load the exercise CSV.
-    # IMPORTANT: the CSV must live in the same folder as app.py
+    # Load the exercise CSV. CSV must live in the same folder as app.py
     df = load_exercises("CS Workout Exercises Database CSV.csv")
     # Determine which view to show based on session_state
-    # If a workout already exists and is not finished, show the flashcards.
     if "workout" in state and not state.get("finished", False):
         show_flashcards()
         return
