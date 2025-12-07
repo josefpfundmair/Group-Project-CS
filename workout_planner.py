@@ -449,8 +449,7 @@ def main():
     if state.get("finished", False):
         show_completion()
         return
-    # If we reach this point, no workout is in progress.
-    # We show the workout builder form.
+    # If we reach this point, no workout is in progres --> show the workout builder form.
     st.subheader("Build a workout with Pumpfessor Joe")
     st.caption("Answer a few questions and get a suggested workout plan.")
     # Workout type selector
@@ -467,7 +466,6 @@ def main():
     # Time available slider
     minutes = st.slider("How many minutes do you have?", 15, 120, 45, 5)
     # Save meta information about the current workout in session state.
-    # Other parts of the app (e.g. a calorie tracker) can also read this.
     st.session_state["current_workout"] = {
         "title": title,
         "minutes": minutes,
